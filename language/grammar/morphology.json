@@ -1,0 +1,48 @@
+{
+  "description": "Morphology rules for Aster",
+  "version": "1.0.0",
+  "separator": "-",
+  "meaning_units": {
+    "data":      { "type": "entity",   "meaning": "raw information or input" },
+    "stream":    { "type": "modifier", "meaning": "continuous flow" },
+    "batch":     { "type": "modifier", "meaning": "discrete grouped set" },
+    "model":     { "type": "entity",   "meaning": "learned representation" },
+    "memory":    { "type": "entity",   "meaning": "stored state or context" },
+    "context":   { "type": "modifier", "meaning": "surrounding conditions" },
+    "knowledge": { "type": "entity",   "meaning": "structured understanding" },
+    "metrics":   { "type": "entity",   "meaning": "quantified measurements" },
+    "pipeline":  { "type": "entity",   "meaning": "sequential processing chain" },
+    "graph":     { "type": "entity",   "meaning": "relational structure" },
+    "train":     { "type": "action",   "meaning": "learning from examples" },
+    "ingest":    { "type": "action",   "meaning": "receive and absorb input" },
+    "infer":     { "type": "action",   "meaning": "derive conclusion from input" },
+    "evaluate":  { "type": "action",   "meaning": "assess quality or fitness" },
+    "transform": { "type": "action",   "meaning": "change form while preserving meaning" },
+    "bind":      { "type": "action",   "meaning": "link two concepts together" },
+    "cycle":     { "type": "cycle",    "meaning": "repeating process" },
+    "loop":      { "type": "cycle",    "meaning": "iterative repetition" },
+    "flow":      { "type": "modifier", "meaning": "direction of movement" }
+  },
+  "composition_rules": [
+    {
+      "pattern": "{entity}-{modifier}-{action}",
+      "description": "An entity modified in context performing an action",
+      "example": "data-stream-ingest"
+    },
+    {
+      "pattern": "{entity}-{action}-{cycle}",
+      "description": "An entity undergoing a cyclic action",
+      "example": "model-train-cycle"
+    },
+    {
+      "pattern": "{entity}-{modifier}-{action}",
+      "description": "Memory bound in a context",
+      "example": "memory-context-bind"
+    }
+  ],
+  "decomposition": {
+    "description": "Compound tokens are split on the separator and each unit resolved independently",
+    "algorithm": "split-then-lookup",
+    "fallback": "treat unknown units as opaque identifiers"
+  }
+}

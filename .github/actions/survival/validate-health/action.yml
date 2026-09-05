@@ -1,0 +1,77 @@
+name: 'Validate Health'
+description: 'Comprehensive system health validation'
+
+inputs:
+  phase:
+    description: 'Current phase being validated'
+    default: 'general'
+    required: false
+  strict:
+    description: 'Strict mode (fail on warnings)'
+    default: 'false'
+    required: false
+
+outputs:
+  health-status:
+    description: 'Overall health status (healthy, degraded, unhealthy)'
+    value: ${{ steps.validate.outputs.status }}
+  issues-found:
+    description: 'Number of issues found'
+    value: ${{ steps.validate.outputs.issues }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate system health
+      id: validate
+      shell: bash
+      run: |
+        echo "Validating system health for phase: ${{ inputs.phase }}"
+        
+        ISSUES=0
+        
+        # Check disk space
+        DISK=$(df -BG . | tail -1 | awk '{print $4}' | sed 's/G//')
+        if [[ $DISK -lt 5 ]]; then
+          echo "::warning::Low disk space: ${DISK}GB"
+          ISSUES=$((ISSUES + 1))
+        fi
+        
+        # Check memory
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          MEMORY=$(vm_stat | grep "Pages free" | awk '{print int($3 * 4096 / 1024 / 1024)}')
+        else
+          MEMORY=$(free -m | awk 'NR==2 {print $7}')
+        fi
+        
+        if [[ $MEMORY -lt 500 ]]; then
+          echo "::warning::Low memory: ${MEMORY}MB"
+          ISSUES=$((ISSUES + 1))
+        fi
+        
+        # Check required commands
+        REQUIRED_COMMANDS=("bash" "git" "awk" "sed")
+        for cmd in "${REQUIRED_COMMANDS[@]}"; do
+          if ! command -v "$cmd" &> /dev/null; then
+            echo "::error::Required command not found: $cmd"
+            ISSUES=$((ISSUES + 1))
+          fi
+        done
+        
+        # Determine health status
+        if [[ $ISSUES -eq 0 ]]; then
+          STATUS="healthy"
+        elif [[ $ISSUES -le 2 ]]; then
+          STATUS="degraded"
+        else
+          STATUS="unhealthy"
+        fi
+        
+        echo "status=$STATUS" >> $GITHUB_OUTPUT
+        echo "issues=$ISSUES" >> $GITHUB_OUTPUT
+        echo "Health status: $STATUS ($ISSUES issues found)"
+        
+        if [[ "${{ inputs.strict }}" == "true" ]] && [[ $ISSUES -gt 0 ]]; then
+          echo "::error::Strict mode: failing due to $ISSUES issues"
+          exit 1
+        fi

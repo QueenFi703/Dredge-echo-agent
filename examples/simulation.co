@@ -1,0 +1,20 @@
+# simulation.co
+# Example: an agent-based simulation loop.
+#
+# Agents perceive their environment, decide on actions, and update
+# the world state.  Metrics are collected at the end of each tick.
+
+entity environment
+entity agent
+entity world_state
+entity metrics
+
+action perceive(environment -> agent)
+action decide(agent -> world_state)
+action measure(world_state -> metrics)
+
+cycle simulation_tick {
+    perceive
+    decide
+    measure
+}

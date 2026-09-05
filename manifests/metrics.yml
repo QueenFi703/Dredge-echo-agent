@@ -1,0 +1,44 @@
+# Defines what matters: the metrics we collect and track
+
+metrics:
+  resource:
+    description: "System resource availability and usage"
+    measures:
+      - disk_available_gb
+      - memory_available_mb
+      - cpu_usage_percent
+      - cache_size_mb
+    
+  timing:
+    description: "Execution time measurements"
+    measures:
+      - phase_duration_seconds
+      - total_workflow_duration_seconds
+      - step_duration_seconds
+      - queue_time_seconds
+    
+  outcome:
+    description: "Success and failure indicators"
+    measures:
+      - tests_passed
+      - tests_failed
+      - tests_skipped
+      - build_success
+      - deployment_status
+      - exit_code
+    
+  cost:
+    description: "Resource consumption and efficiency"
+    measures:
+      - workflow_minutes_used
+      - cache_size_mb
+      - artifact_size_mb
+      - network_bytes_transferred
+    
+  quality:
+    description: "Code quality metrics"
+    measures:
+      - coverage_percent
+      - linting_errors
+      - security_alerts
+      - deprecation_warnings

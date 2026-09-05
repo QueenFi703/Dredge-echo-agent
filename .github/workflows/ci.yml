@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  continuous-integration:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Phase 1: INIT
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Initialize workflow
+        id: init
+        uses: ./.github/actions/cadence/phase-init
+        with:
+          context: ci
+          strict-health-check: 'false'
+      
+      # Phase 2: PREPARE
+      - name: Prepare environment
+        id: prepare
+        uses: ./.github/actions/cadence/phase-prepare
+        with:
+          language: python
+          cache-key: ${{ hashFiles('**/requirements.txt') }}
+          install-dependencies: 'false'
+      
+      # Phase 3: EXECUTE
+      - name: Run linting
+        id: lint
+        uses: ./.github/actions/cadence/phase-execute
+        with:
+          command: echo "Linting would run here"
+          timeout-minutes: 5
+          
+      - name: Run tests
+        id: test
+        if: success() || failure()
+        uses: ./.github/actions/cadence/phase-execute
+        with:
+          command: echo "Tests would run here"
+          timeout-minutes: 15
+          collect-coverage: 'true'
+      
+      # Phase 4: REPORT
+      - name: Generate test report
+        if: always()
+        uses: ./.github/actions/cadence/phase-report
+        with:
+          phase: test
+          status: ${{ job.status }}
+          metrics: ${{ steps.test.outputs.metrics }}
+      
+      # Phase 5: CLEANUP
+      - name: Cleanup resources
+        if: always()
+        uses: ./.github/actions/cadence/phase-cleanup
+        with:
+          prune-cache: 'true'
+          cleanup-disk: 'true'
+          aggressive: 'false'
+      
+      # Phase 6: SEAL
+      - name: Final validation
+        if: always()
+        uses: ./.github/actions/survival/validate-health
+        with:
+          phase: seal
+          strict: 'false'

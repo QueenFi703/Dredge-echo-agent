@@ -1,0 +1,66 @@
+name: 'Phase Init'
+description: 'Universal initialization pattern for any workflow'
+
+inputs:
+  context:
+    description: 'Workflow context (ci/test/deploy/local)'
+    required: true
+  strict-health-check:
+    description: 'Enable strict health check mode'
+    default: 'false'
+    required: false
+  
+outputs:
+  baseline-metrics:
+    description: 'JSON of initial resource state'
+    value: ${{ steps.metrics.outputs.metrics-json }}
+  context-id:
+    description: 'Unique identifier for this execution'
+    value: ${{ steps.trace.outputs.context-id }}
+  health-status:
+    description: 'System health status'
+    value: ${{ steps.health.outputs.health-status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Establish trace context
+      id: trace
+      uses: ./.github/actions/observability/trace-context
+      with:
+        context-type: ${{ inputs.context }}
+        
+    - name: Check system resources
+      id: resources
+      uses: ./.github/actions/survival/resource-check
+      with:
+        min-disk-gb: 5
+        min-memory-mb: 500
+        fail-mode: soft
+      
+    - name: Validate system health
+      id: health
+      uses: ./.github/actions/survival/validate-health
+      with:
+        phase: init
+        strict: ${{ inputs.strict-health-check }}
+        
+    - name: Record baseline metrics
+      id: metrics
+      uses: ./.github/actions/observability/metrics-collect
+      with:
+        phase: init
+        metric-type: resource
+        
+    - name: Generate init summary
+      uses: ./.github/actions/observability/summary-generate
+      with:
+        phase: init
+        status: success
+        metrics: ${{ steps.metrics.outputs.metrics-json }}
+        additional-info: |
+          **Context:** ${{ inputs.context }}
+          **Context ID:** ${{ steps.trace.outputs.context-id }}
+          **Health:** ${{ steps.health.outputs.health-status }}
+          **Disk:** ${{ steps.resources.outputs.disk-available }}GB
+          **Memory:** ${{ steps.resources.outputs.memory-available }}MB

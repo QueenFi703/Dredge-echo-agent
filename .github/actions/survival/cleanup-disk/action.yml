@@ -1,0 +1,64 @@
+name: 'Cleanup Disk'
+description: 'Removes temporary files and frees disk space'
+
+inputs:
+  aggressive:
+    description: 'Enable aggressive cleanup (removes caches)'
+    default: 'false'
+    required: false
+  dry-run:
+    description: 'Show what would be deleted without deleting'
+    default: 'false'
+    required: false
+
+outputs:
+  freed-space-mb:
+    description: 'Amount of space freed in MB'
+    value: ${{ steps.cleanup.outputs.freed }}
+  files-removed:
+    description: 'Number of files removed'
+    value: ${{ steps.cleanup.outputs.count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Cleanup disk space
+      id: cleanup
+      shell: bash
+      run: |
+        BEFORE=$(df -BM . | tail -1 | awk '{print $3}' | sed 's/M//')
+        REMOVED_COUNT=0
+        
+        echo "Starting disk cleanup..."
+        
+        # Remove common temporary files
+        TEMP_PATTERNS=("*.tmp" "*.log" ".cache/*" "**/__pycache__")
+        
+        for pattern in "${TEMP_PATTERNS[@]}"; do
+          if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+            echo "Would remove: $pattern"
+            COUNT=$(find . -name "$pattern" -type f 2>/dev/null | wc -l || echo "0")
+          else
+            COUNT=$(find . -name "$pattern" -type f -delete -print 2>/dev/null | wc -l || echo "0")
+          fi
+          REMOVED_COUNT=$((REMOVED_COUNT + COUNT))
+        done
+        
+        # Aggressive cleanup
+        if [[ "${{ inputs.aggressive }}" == "true" ]]; then
+          echo "Performing aggressive cleanup..."
+          
+          if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+            echo "Would remove: node_modules/.cache"
+            echo "Would remove: .pytest_cache"
+          else
+            rm -rf node_modules/.cache .pytest_cache 2>/dev/null || true
+          fi
+        fi
+        
+        AFTER=$(df -BM . | tail -1 | awk '{print $3}' | sed 's/M//')
+        FREED=$((AFTER - BEFORE))
+        
+        echo "freed=$FREED" >> $GITHUB_OUTPUT
+        echo "count=$REMOVED_COUNT" >> $GITHUB_OUTPUT
+        echo "Cleanup complete: ${FREED}MB freed, ${REMOVED_COUNT} files removed"

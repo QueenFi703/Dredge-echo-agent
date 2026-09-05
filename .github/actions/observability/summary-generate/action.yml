@@ -1,0 +1,102 @@
+name: 'Summary Generate'
+description: 'Creates human-readable execution summary'
+
+inputs:
+  phase:
+    description: 'Which phase is reporting'
+    required: true
+  metrics:
+    description: 'JSON of collected metrics'
+    required: false
+  status:
+    description: 'success, warning, failure'
+    required: true
+  additional-info:
+    description: 'Additional information to include'
+    required: false
+
+outputs:
+  summary-file:
+    description: 'Path to summary file'
+    value: ${{ steps.generate.outputs.file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Generate markdown summary
+      id: generate
+      shell: bash
+      run: |
+        mkdir -p .metrics
+        
+        # Generate unique ID for this summary
+        UNIQUE_ID="$(date +%s%N | md5sum | head -c 8)"
+        echo "unique-id=$UNIQUE_ID" >> $GITHUB_OUTPUT
+        
+        SUMMARY_FILE=".metrics/summary-${{ inputs.phase }}.md"
+        
+        # Determine status emoji
+        case "${{ inputs.status }}" in
+          success)
+            STATUS_EMOJI="✅"
+            ;;
+          warning)
+            STATUS_EMOJI="⚠️"
+            ;;
+          failure)
+            STATUS_EMOJI="❌"
+            ;;
+          *)
+            STATUS_EMOJI="ℹ️"
+            ;;
+        esac
+        
+        # Generate summary
+        cat > "$SUMMARY_FILE" << EOF
+        ## $STATUS_EMOJI Phase: ${{ inputs.phase }}
+        
+        **Status:** ${{ inputs.status }}
+        **Timestamp:** $(date -Iseconds)
+        **Phase:** ${{ inputs.phase }}
+        
+        EOF
+        
+        # Add metrics if provided
+        # Store in variable to safely handle JSON with special characters
+        METRICS_INPUT='${{ inputs.metrics }}'
+        if [[ -n "$METRICS_INPUT" ]]; then
+          {
+            echo "        ### 📊 Metrics"
+            echo "        "
+            echo "        \`\`\`json"
+            echo "$METRICS_INPUT"
+            echo "        \`\`\`"
+            echo "        "
+          } >> "$SUMMARY_FILE"
+        fi
+        
+        # Add additional info if provided
+        ADDITIONAL_INFO='${{ inputs.additional-info }}'
+        if [[ -n "$ADDITIONAL_INFO" ]]; then
+          {
+            echo "        ### 📝 Additional Information"
+            echo "        "
+            echo "$ADDITIONAL_INFO"
+            echo "        "
+          } >> "$SUMMARY_FILE"
+        fi
+        
+        echo "file=$SUMMARY_FILE" >> $GITHUB_OUTPUT
+        
+        # Append to GitHub step summary
+        cat "$SUMMARY_FILE" >> $GITHUB_STEP_SUMMARY
+        
+        echo "Summary generated for phase: ${{ inputs.phase }}"
+        
+    - name: Upload summary artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: summary-${{ inputs.phase }}-${{ steps.generate.outputs.unique-id }}
+        path: .metrics/summary-${{ inputs.phase }}.md
+        retention-days: 30
+        if-no-files-found: warn

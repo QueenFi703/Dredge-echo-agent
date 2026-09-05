@@ -1,0 +1,86 @@
+name: 'Graceful Fail'
+description: 'Handles failure gracefully with context and recovery information'
+
+inputs:
+  phase:
+    description: 'Phase where failure occurred'
+    required: true
+  error-message:
+    description: 'Error message to report'
+    required: true
+  exit-code:
+    description: 'Exit code from failed operation'
+    default: '1'
+    required: false
+  recovery-hint:
+    description: 'Hint for recovery'
+    required: false
+
+outputs:
+  failure-id:
+    description: 'Unique identifier for this failure'
+    value: ${{ steps.report.outputs.id }}
+  failure-report:
+    description: 'Path to failure report'
+    value: ${{ steps.report.outputs.report_path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Generate failure report
+      id: report
+      shell: bash
+      run: |
+        FAILURE_ID="failure-$(date +%s)"
+        REPORT_PATH=".metrics/${FAILURE_ID}.json"
+        
+        mkdir -p .metrics
+        
+        cat > "$REPORT_PATH" << EOF
+        {
+          "failure_id": "$FAILURE_ID",
+          "phase": "${{ inputs.phase }}",
+          "error_message": "${{ inputs.error-message }}",
+          "exit_code": ${{ inputs.exit-code }},
+          "recovery_hint": "${{ inputs.recovery-hint }}",
+          "timestamp": "$(date -Iseconds)",
+          "workflow": "${{ github.workflow }}",
+          "run_id": "${{ github.run_id }}"
+        }
+        EOF
+        
+        echo "id=$FAILURE_ID" >> $GITHUB_OUTPUT
+        echo "report_path=$REPORT_PATH" >> $GITHUB_OUTPUT
+        
+        echo "::error::Failure in phase '${{ inputs.phase }}': ${{ inputs.error-message }}"
+        
+        if [[ -n "${{ inputs.recovery-hint }}" ]]; then
+          echo "::notice::Recovery hint: ${{ inputs.recovery-hint }}"
+        fi
+        
+    - name: Add to summary
+      shell: bash
+      run: |
+        cat >> $GITHUB_STEP_SUMMARY << EOF
+        ## ⚠️ Graceful Failure
+
+        **Phase:** ${{ inputs.phase }}
+        **Error:** ${{ inputs.error-message }}
+        **Exit Code:** ${{ inputs.exit-code }}
+        **Timestamp:** $(date -Iseconds)
+        
+        EOF
+        
+        if [[ -n "${{ inputs.recovery-hint }}" ]]; then
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+        ### Recovery Suggestion
+        ${{ inputs.recovery-hint }}
+        EOF
+        fi
+        
+    - name: Upload failure report
+      uses: actions/upload-artifact@v4
+      with:
+        name: failure-report-${{ steps.report.outputs.id }}
+        path: ${{ steps.report.outputs.report_path }}
+        retention-days: 30

@@ -1,0 +1,21 @@
+# data_pipeline.co
+# Example: a multi-stage data processing pipeline.
+#
+# Data flows from ingestion through transformation and validation
+# before being stored.  Each stage is an action; the pipeline
+# cycle defines their execution order.
+
+entity raw_data
+entity clean_data
+entity validated_data
+entity store
+
+action ingest(raw_data -> clean_data)
+action transform(clean_data -> validated_data)
+action persist(validated_data -> store)
+
+cycle pipeline {
+    ingest
+    transform
+    persist
+}

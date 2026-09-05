@@ -1,0 +1,19 @@
+# ai_training.co
+# Example: a minimal AI training pipeline expressed in the
+# Aster.
+#
+# Entities represent the things that exist in the system.
+# Actions describe transformations between them.
+# The cycle ties it all into a repeating process.
+
+entity data
+entity model
+entity metrics
+
+action train(data -> model)
+action evaluate(model -> metrics)
+
+cycle training {
+    train
+    evaluate
+}

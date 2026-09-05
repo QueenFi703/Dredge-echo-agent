@@ -1,0 +1,120 @@
+name: 'Failure Report'
+description: 'Generates comprehensive failure report with diagnostics'
+
+inputs:
+  phase:
+    description: 'Phase where failure occurred'
+    required: true
+  error-details:
+    description: 'Detailed error information'
+    required: true
+  logs:
+    description: 'Relevant log content'
+    required: false
+
+outputs:
+  report-id:
+    description: 'Unique identifier for this failure report'
+    value: ${{ steps.generate.outputs.id }}
+  report-path:
+    description: 'Path to failure report'
+    value: ${{ steps.generate.outputs.path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Collect diagnostic information
+      id: diagnostics
+      shell: bash
+      run: |
+        echo "Collecting diagnostic information..."
+        
+        # System state
+        DISK=$(df -BG . | tail -1 | awk '{print $4}' | sed 's/G//')
+        
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          MEMORY=$(vm_stat | grep "Pages free" | awk '{print int($3 * 4096 / 1024 / 1024)}')
+        else
+          MEMORY=$(free -m | awk 'NR==2 {print $7}')
+        fi
+        
+        echo "disk_gb=$DISK" >> $GITHUB_OUTPUT
+        echo "memory_mb=$MEMORY" >> $GITHUB_OUTPUT
+        
+    - name: Generate failure report
+      id: generate
+      shell: bash
+      run: |
+        mkdir -p .metrics
+        
+        REPORT_ID="failure-${{ inputs.phase }}-$(date +%s)"
+        REPORT_PATH=".metrics/${REPORT_ID}.md"
+        
+        cat > "$REPORT_PATH" << EOF
+        # ❌ Failure Report
+        
+        ## Overview
+        
+        - **Report ID:** $REPORT_ID
+        - **Phase:** ${{ inputs.phase }}
+        - **Timestamp:** $(date -Iseconds)
+        - **Workflow:** ${{ github.workflow }}
+        - **Run ID:** ${{ github.run_id }}
+        
+        ## Error Details
+        
+        \`\`\`
+        ${{ inputs.error-details }}
+        \`\`\`
+        
+        ## System State at Failure
+        
+        - **Disk Available:** ${{ steps.diagnostics.outputs.disk_gb }}GB
+        - **Memory Available:** ${{ steps.diagnostics.outputs.memory_mb }}MB
+        
+        ## Context
+        
+        - **Repository:** ${{ github.repository }}
+        - **Branch:** ${{ github.ref }}
+        - **Commit:** ${{ github.sha }}
+        - **Actor:** ${{ github.actor }}
+        - **Event:** ${{ github.event_name }}
+        
+        EOF
+        
+        if [[ -n "${{ inputs.logs }}" ]]; then
+          cat >> "$REPORT_PATH" << EOF
+        ## Relevant Logs
+        
+        \`\`\`
+        ${{ inputs.logs }}
+        \`\`\`
+        
+        EOF
+        fi
+        
+        cat >> "$REPORT_PATH" << EOF
+        ## Next Steps
+        
+        1. Review the error details above
+        2. Check system resources (disk, memory)
+        3. Verify phase prerequisites were met
+        4. Consult the runbook for phase '${{ inputs.phase }}'
+        5. Check recent changes to the workflow
+        
+        EOF
+        
+        echo "id=$REPORT_ID" >> $GITHUB_OUTPUT
+        echo "path=$REPORT_PATH" >> $GITHUB_OUTPUT
+        
+        # Add to step summary
+        cat "$REPORT_PATH" >> $GITHUB_STEP_SUMMARY
+        
+        echo "Failure report generated: $REPORT_ID"
+        
+    - name: Upload failure report
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.generate.outputs.id }}
+        path: ${{ steps.generate.outputs.path }}
+        retention-days: 90

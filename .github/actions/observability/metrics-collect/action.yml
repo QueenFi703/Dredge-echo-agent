@@ -1,0 +1,73 @@
+name: 'Metrics Collect'
+description: 'Collects and records system and workflow metrics'
+
+inputs:
+  metric-type:
+    description: 'Type of metrics to collect (resource, timing, outcome, cost)'
+    default: 'resource'
+    required: false
+  phase:
+    description: 'Current phase collecting metrics'
+    required: true
+  custom-metrics:
+    description: 'Custom metrics as JSON'
+    required: false
+
+outputs:
+  metrics-file:
+    description: 'Path to metrics file'
+    value: ${{ steps.collect.outputs.file }}
+  metrics-json:
+    description: 'Metrics as JSON string'
+    value: ${{ steps.collect.outputs.json }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Collect metrics
+      id: collect
+      shell: bash
+      run: |
+        mkdir -p .metrics
+        
+        METRICS_FILE=".metrics/metrics-${{ inputs.phase }}-$(date +%s).json"
+        
+        # Collect resource metrics
+        DISK_AVAILABLE=$(df -BG . | tail -1 | awk '{print $4}' | sed 's/G//')
+        
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          MEMORY_AVAILABLE=$(vm_stat | grep "Pages free" | awk '{print int($3 * 4096 / 1024 / 1024)}')
+        else
+          MEMORY_AVAILABLE=$(free -m | awk 'NR==2 {print $7}')
+        fi
+        
+        CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1 2>/dev/null || echo "0")
+        
+        # Create metrics JSON
+        cat > "$METRICS_FILE" << EOF
+        {
+          "type": "${{ inputs.metric-type }}",
+          "phase": "${{ inputs.phase }}",
+          "timestamp": "$(date -Iseconds)",
+          "resource": {
+            "disk_available_gb": $DISK_AVAILABLE,
+            "memory_available_mb": ${MEMORY_AVAILABLE:-0},
+            "cpu_usage_percent": ${CPU_USAGE:-0}
+          },
+          "workflow": {
+            "name": "${{ github.workflow }}",
+            "run_id": "${{ github.run_id }}",
+            "run_number": "${{ github.run_number }}"
+          }
+        }
+        EOF
+        
+        # Merge custom metrics if provided
+        if [[ -n "${{ inputs.custom-metrics }}" ]]; then
+          echo "Adding custom metrics..."
+        fi
+        
+        echo "file=$METRICS_FILE" >> $GITHUB_OUTPUT
+        echo "json=$(cat $METRICS_FILE | tr -d '\n')" >> $GITHUB_OUTPUT
+        echo "Metrics collected for phase: ${{ inputs.phase }}"
+        cat "$METRICS_FILE"

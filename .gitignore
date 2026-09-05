@@ -1,0 +1,30 @@
+# Metrics artifacts and temporary files
+.metrics/
+.local-metrics/
+*.tmp
+*.log
+
+# Cache directories
+.cache/
+node_modules/.cache/
+.pytest_cache/
+__pycache__/
+
+# Build artifacts
+dist/
+build/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local test artifacts
+act-*.json

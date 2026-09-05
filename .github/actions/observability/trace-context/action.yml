@@ -1,0 +1,60 @@
+name: 'Trace Context'
+description: 'Establishes and propagates execution context for tracing'
+
+inputs:
+  context-type:
+    description: 'Type of context (ci, test, deploy, local)'
+    required: true
+
+outputs:
+  context-id:
+    description: 'Unique identifier for this execution'
+    value: ${{ steps.create.outputs.id }}
+  trace-file:
+    description: 'Path to trace context file'
+    value: ${{ steps.create.outputs.file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create trace context
+      id: create
+      shell: bash
+      run: |
+        mkdir -p .metrics
+        
+        CONTEXT_ID="${{ inputs.context-type }}-$(date +%s)-${{ github.run_id }}"
+        TRACE_FILE=".metrics/trace-context.json"
+        
+        cat > "$TRACE_FILE" << EOF
+        {
+          "context_id": "$CONTEXT_ID",
+          "context_type": "${{ inputs.context-type }}",
+          "timestamp": "$(date -Iseconds)",
+          "workflow": {
+            "name": "${{ github.workflow }}",
+            "run_id": "${{ github.run_id }}",
+            "run_number": "${{ github.run_number }}",
+            "run_attempt": "${{ github.run_attempt }}"
+          },
+          "repository": {
+            "name": "${{ github.repository }}",
+            "ref": "${{ github.ref }}",
+            "sha": "${{ github.sha }}"
+          },
+          "actor": "${{ github.actor }}",
+          "event": "${{ github.event_name }}"
+        }
+        EOF
+        
+        echo "id=$CONTEXT_ID" >> $GITHUB_OUTPUT
+        echo "file=$TRACE_FILE" >> $GITHUB_OUTPUT
+        
+        echo "Trace context established: $CONTEXT_ID"
+        cat "$TRACE_FILE"
+        
+    - name: Export trace context
+      shell: bash
+      run: |
+        echo "TRACE_CONTEXT_ID=${{ steps.create.outputs.id }}" >> $GITHUB_ENV
+        echo "Trace context exported to environment"

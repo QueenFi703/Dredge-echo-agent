@@ -1,0 +1,54 @@
+# Defines how to handle resource pressure and cleanup
+
+policies:
+  cache_pruning:
+    description: "Automatic cache cleanup rules"
+    triggers:
+      - condition: "disk_space < 10gb"
+        action: "prune_oldest_cache_entries"
+        priority: high
+      - condition: "cache_age > 30d"
+        action: "delete_cache_entry"
+        priority: medium
+      - condition: "cache_size > 5gb"
+        action: "prune_least_used_entries"
+        priority: medium
+    retention:
+      max_age: 30d
+      max_size: 10gb
+      min_access_count: 1
+      
+  artifact_retention:
+    description: "Artifact storage management"
+    default_retention: 90d
+    by_type:
+      test_results: 30d
+      coverage_reports: 60d
+      build_artifacts: 90d
+      deployment_logs: 180d
+    max_size_per_workflow: 1gb
+    
+  temp_file_cleanup:
+    description: "Temporary file management"
+    patterns:
+      - "*.tmp"
+      - "*.log"
+      - ".cache/*"
+      - "node_modules/.cache/*"
+      - "**/__pycache__/*"
+    max_age: 1d
+    cleanup_on: ["phase_cleanup", "workflow_failure"]
+    
+  disk_emergency:
+    description: "Emergency cleanup when disk is critically low"
+    trigger: "disk_space < 5gb"
+    actions:
+      - name: "Prune all caches"
+        order: 1
+      - name: "Delete old artifacts"
+        order: 2
+      - name: "Clear temp files"
+        order: 3
+      - name: "Report remaining space"
+        order: 4
+    escalation: "fail_workflow_if_still_critical"

@@ -1,0 +1,106 @@
+name: 'Phase Execute'
+description: 'Execution phase for running build/test/deploy commands'
+
+inputs:
+  command:
+    description: 'Command to execute'
+    required: true
+  working-directory:
+    description: 'Working directory for command execution'
+    default: '.'
+    required: false
+  timeout-minutes:
+    description: 'Timeout for command execution'
+    default: '30'
+    required: false
+  collect-coverage:
+    description: 'Collect code coverage'
+    default: 'false'
+    required: false
+  
+outputs:
+  exit-code:
+    description: 'Exit code from command execution'
+    value: ${{ steps.execute.outputs.code }}
+  metrics:
+    description: 'Execution metrics as JSON'
+    value: ${{ steps.metrics.outputs.metrics-json }}
+  status:
+    description: 'Execution status (success, failure)'
+    value: ${{ steps.status.outputs.result }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Record start time
+      id: start
+      shell: bash
+      run: |
+        echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+        echo "Starting execution at $(date -Iseconds)"
+        
+    - name: Execute command
+      id: execute
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set +e
+        
+        echo "Executing: ${{ inputs.command }}"
+        
+        # Execute with timeout
+        timeout $((${{ inputs.timeout-minutes }} * 60)) bash -c "${{ inputs.command }}"
+        EXIT_CODE=$?
+        
+        echo "code=$EXIT_CODE" >> $GITHUB_OUTPUT
+        
+        if [[ $EXIT_CODE -eq 0 ]]; then
+          echo "Command executed successfully"
+        else
+          echo "::warning::Command failed with exit code $EXIT_CODE"
+        fi
+        
+        exit $EXIT_CODE
+        
+    - name: Calculate duration
+      id: duration
+      if: always()
+      shell: bash
+      run: |
+        END_TIME=$(date +%s)
+        START_TIME=${{ steps.start.outputs.start_time }}
+        DURATION=$((END_TIME - START_TIME))
+        echo "duration=$DURATION" >> $GITHUB_OUTPUT
+        echo "Execution duration: ${DURATION}s"
+        
+    - name: Determine status
+      id: status
+      if: always()
+      shell: bash
+      run: |
+        if [[ "${{ steps.execute.outputs.code }}" == "0" ]]; then
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "result=failure" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Collect metrics
+      id: metrics
+      if: always()
+      uses: ./.github/actions/observability/metrics-collect
+      with:
+        phase: execute
+        metric-type: timing
+        
+    - name: Generate summary
+      if: always()
+      uses: ./.github/actions/observability/summary-generate
+      with:
+        phase: execute
+        status: ${{ steps.status.outputs.result }}
+        metrics: ${{ steps.metrics.outputs.metrics-json }}
+        additional-info: |
+          **Command:** `${{ inputs.command }}`
+          **Exit Code:** ${{ steps.execute.outputs.code }}
+          **Duration:** ${{ steps.duration.outputs.duration }}s
+          **Working Directory:** ${{ inputs.working-directory }}

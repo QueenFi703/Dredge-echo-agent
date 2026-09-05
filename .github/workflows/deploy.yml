@@ -1,0 +1,83 @@
+name: Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+      # Phase 1: INIT
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Initialize deployment
+        id: init
+        uses: ./.github/actions/cadence/phase-init
+        with:
+          context: deploy
+          strict-health-check: 'true'
+      
+      # Phase 2: PREPARE
+      - name: Prepare deployment
+        id: prepare
+        uses: ./.github/actions/cadence/phase-prepare
+        with:
+          language: python
+          cache-key: deploy-${{ github.sha }}
+          install-dependencies: 'true'
+      
+      # Phase 3: EXECUTE
+      - name: Build artifacts
+        id: build
+        uses: ./.github/actions/cadence/phase-execute
+        with:
+          command: pip install --quiet build && python -m build --outdir dist/
+          timeout-minutes: 10
+          
+      - name: Deploy to ${{ github.event.inputs.environment || 'production' }}
+        id: deploy
+        uses: ./.github/actions/cadence/phase-execute
+        with:
+          command: DEPLOY_ENV=${{ github.event.inputs.environment || 'production' }} bash scripts/core/deploy.sh --env ${{ github.event.inputs.environment || 'production' }} --skip-build
+          timeout-minutes: 15
+      
+      # Phase 4: REPORT
+      - name: Generate deployment report
+        if: always()
+        uses: ./.github/actions/cadence/phase-report
+        with:
+          phase: deploy
+          status: ${{ job.status }}
+          metrics: ${{ steps.deploy.outputs.metrics }}
+          artifacts-to-upload: '.metrics/'
+      
+      # Phase 5: CLEANUP
+      - name: Cleanup deployment artifacts
+        if: always()
+        uses: ./.github/actions/cadence/phase-cleanup
+        with:
+          prune-cache: 'false'
+          cleanup-disk: 'true'
+          aggressive: 'true'
+      
+      # Phase 6: SEAL
+      - name: Verify deployment health
+        if: success()
+        uses: ./.github/actions/survival/validate-health
+        with:
+          phase: seal
+          strict: 'true'

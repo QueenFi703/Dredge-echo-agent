@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aster-lang"
+version = "0.1.0"
+description = "Aster: a fractal operational coherence language"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["language", "interpreter", "coherence", "aster"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Interpreters",
+]
+
+[project.scripts]
+aster = "language.runtime.interpreter:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["language", "compiler", "bridge"]

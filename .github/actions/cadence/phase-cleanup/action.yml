@@ -1,0 +1,89 @@
+name: 'Phase Cleanup'
+description: 'Cleanup phase for resource management and state finalization'
+
+inputs:
+  prune-cache:
+    description: 'Prune old cache entries'
+    default: 'false'
+    required: false
+  cleanup-disk:
+    description: 'Perform disk cleanup'
+    default: 'true'
+    required: false
+  aggressive:
+    description: 'Enable aggressive cleanup'
+    default: 'false'
+    required: false
+  
+outputs:
+  cleanup-status:
+    description: 'Cleanup status (success, partial, failed)'
+    value: ${{ steps.status.outputs.result }}
+  space-freed-mb:
+    description: 'Amount of disk space freed in MB'
+    value: ${{ steps.disk.outputs.freed-space-mb }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Prune cache
+      id: cache
+      if: inputs.prune-cache == 'true'
+      uses: ./.github/actions/survival/prune-cache
+      with:
+        max-age-days: 30
+        max-size-gb: 10
+        
+    - name: Cleanup disk
+      id: disk
+      if: inputs.cleanup-disk == 'true'
+      uses: ./.github/actions/survival/cleanup-disk
+      with:
+        aggressive: ${{ inputs.aggressive }}
+        dry-run: 'false'
+        
+    - name: Final resource check
+      id: resources
+      uses: ./.github/actions/survival/resource-check
+      with:
+        min-disk-gb: 5
+        min-memory-mb: 500
+        fail-mode: soft
+        
+    - name: Determine cleanup status
+      id: status
+      shell: bash
+      run: |
+        RESOURCE_STATUS="${{ steps.resources.outputs.status }}"
+        
+        if [[ "$RESOURCE_STATUS" == "ok" ]]; then
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "Cleanup successful: system resources healthy"
+        elif [[ "$RESOURCE_STATUS" == "warning" ]]; then
+          echo "result=partial" >> $GITHUB_OUTPUT
+          echo "Cleanup partial: resources low but acceptable"
+        else
+          echo "result=failed" >> $GITHUB_OUTPUT
+          echo "::warning::Cleanup failed: resources critically low"
+        fi
+        
+    - name: Collect metrics
+      id: metrics
+      uses: ./.github/actions/observability/metrics-collect
+      with:
+        phase: cleanup
+        metric-type: resource
+        
+    - name: Generate summary
+      uses: ./.github/actions/observability/summary-generate
+      with:
+        phase: cleanup
+        status: ${{ steps.status.outputs.result }}
+        metrics: ${{ steps.metrics.outputs.metrics-json }}
+        additional-info: |
+          **Cache Pruned:** ${{ inputs.prune-cache }}
+          **Disk Cleanup:** ${{ inputs.cleanup-disk }}
+          **Space Freed:** ${{ steps.disk.outputs.freed-space-mb }}MB
+          **Resource Status:** ${{ steps.resources.outputs.status }}
+          **Final Disk:** ${{ steps.resources.outputs.disk-available }}GB
+          **Final Memory:** ${{ steps.resources.outputs.memory-available }}MB

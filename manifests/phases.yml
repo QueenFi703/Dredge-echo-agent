@@ -1,0 +1,52 @@
+# Defines the invariant structure of workflow phases
+
+phases:
+  - name: init
+    required: true
+    order: 1
+    timeout: 5m
+    retry: false
+    description: "Set context, validate environment, check resources, establish baseline metrics"
+    
+  - name: prepare
+    required: true
+    order: 2
+    depends_on: [init]
+    timeout: 10m
+    retry: true
+    description: "Restore caches, install dependencies, validate readiness"
+    
+  - name: execute
+    required: true
+    order: 3
+    depends_on: [prepare]
+    timeout: 30m
+    retry: false
+    description: "Run build / test / deploy, stream logs, collect telemetry"
+    
+  - name: report
+    required: true
+    order: 4
+    depends_on: [execute]
+    timeout: 5m
+    retry: true
+    allow_failure: false
+    description: "Generate summary, record metrics, update dashboard, archive artifacts"
+    
+  - name: cleanup
+    required: true
+    order: 5
+    depends_on: [report]
+    timeout: 10m
+    retry: true
+    always_run: true
+    description: "Prune unused resources, clear ephemeral data, report final state"
+    
+  - name: seal
+    required: false
+    order: 6
+    depends_on: [cleanup]
+    timeout: 5m
+    retry: false
+    always_run: true
+    description: "Final health check, commit metrics, mark completion"

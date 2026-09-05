@@ -1,0 +1,98 @@
+# Workflow Template - The Canonical Shape
+# All workflows inherit from this pattern
+
+name: _template
+
+# This is the universal workflow pattern that all other workflows follow
+# It demonstrates the fractal structure: Init → Prepare → Execute → Report → Cleanup
+
+on:
+  workflow_call:
+    inputs:
+      context:
+        description: 'Workflow context (ci/test/deploy)'
+        required: true
+        type: string
+      language:
+        description: 'Programming language'
+        required: false
+        type: string
+        default: 'python'
+      command:
+        description: 'Command to execute'
+        required: true
+        type: string
+
+jobs:
+  execute-with-cadence:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Phase 1: INIT
+      # Set context, validate environment, check resources, establish baseline
+      - name: Phase 1 - Init
+        id: init
+        uses: ./.github/actions/cadence/phase-init
+        with:
+          context: ${{ inputs.context }}
+          strict-health-check: 'false'
+      
+      # Checkout must happen after init to have the actions available
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Phase 2: PREPARE
+      # Restore caches, install dependencies, validate readiness
+      - name: Phase 2 - Prepare
+        id: prepare
+        uses: ./.github/actions/cadence/phase-prepare
+        with:
+          language: ${{ inputs.language }}
+          cache-key: ${{ hashFiles('**/requirements.txt', '**/package.json', '**/go.mod') }}
+          install-dependencies: 'true'
+      
+      # Phase 3: EXECUTE
+      # Run build / test / deploy, stream logs, collect telemetry
+      - name: Phase 3 - Execute
+        id: execute
+        uses: ./.github/actions/cadence/phase-execute
+        with:
+          command: ${{ inputs.command }}
+          timeout-minutes: 30
+          collect-coverage: 'false'
+      
+      # Phase 4: REPORT
+      # Generate summary, record metrics, update dashboard, archive artifacts
+      - name: Phase 4 - Report
+        if: always()
+        id: report
+        uses: ./.github/actions/cadence/phase-report
+        with:
+          phase: execute
+          status: ${{ job.status }}
+          metrics: ${{ steps.execute.outputs.metrics }}
+      
+      # Phase 5: CLEANUP
+      # Prune unused resources, clear ephemeral data, report final state
+      - name: Phase 5 - Cleanup
+        if: always()
+        id: cleanup
+        uses: ./.github/actions/cadence/phase-cleanup
+        with:
+          prune-cache: 'false'
+          cleanup-disk: 'true'
+          aggressive: 'false'
+      
+      # Phase 6: SEAL (optional)
+      # Final health check, commit metrics, mark completion
+      - name: Phase 6 - Seal
+        if: always()
+        uses: ./.github/actions/survival/validate-health
+        with:
+          phase: seal
+          strict: 'false'
+
+# This pattern is fractal:
+# - Each workflow has these phases
+# - Each phase can have sub-phases with the same structure
+# - Each step follows: init → execute → report → cleanup

@@ -1,0 +1,65 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop, 'feature/*' ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-matrix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        test-suite: [unit, integration]
+    
+    steps:
+      # Phase 1: INIT
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Initialize test execution
+        id: init
+        uses: ./.github/actions/cadence/phase-init
+        with:
+          context: test
+          strict-health-check: 'false'
+      
+      # Phase 2: PREPARE
+      - name: Prepare test environment
+        id: prepare
+        uses: ./.github/actions/cadence/phase-prepare
+        with:
+          language: python
+          cache-key: ${{ matrix.os }}-${{ matrix.test-suite }}-${{ hashFiles('**/requirements.txt') }}
+          install-dependencies: 'false'
+      
+      # Phase 3: EXECUTE
+      - name: Run ${{ matrix.test-suite }} tests
+        id: execute
+        uses: ./.github/actions/cadence/phase-execute
+        with:
+          command: echo "Running ${{ matrix.test-suite }} tests"
+          timeout-minutes: 20
+          collect-coverage: 'true'
+      
+      # Phase 4: REPORT
+      - name: Generate test report
+        if: always()
+        uses: ./.github/actions/cadence/phase-report
+        with:
+          phase: ${{ matrix.test-suite }}
+          status: ${{ job.status }}
+          metrics: ${{ steps.execute.outputs.metrics }}
+          artifacts-to-upload: '.metrics/'
+      
+      # Phase 5: CLEANUP
+      - name: Cleanup test environment
+        if: always()
+        uses: ./.github/actions/cadence/phase-cleanup
+        with:
+          prune-cache: 'true'
+          cleanup-disk: 'true'
+          aggressive: 'false'

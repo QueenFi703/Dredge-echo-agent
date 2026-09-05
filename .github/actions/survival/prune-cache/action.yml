@@ -1,0 +1,65 @@
+name: 'Prune Cache'
+description: 'Removes old or unused cache entries'
+
+inputs:
+  max-age-days:
+    description: 'Maximum age of cache entries to keep'
+    default: '30'
+    required: false
+  max-size-gb:
+    description: 'Maximum total cache size'
+    default: '10'
+    required: false
+
+outputs:
+  pruned-entries:
+    description: 'Number of cache entries pruned'
+    value: ${{ steps.prune.outputs.count }}
+  space-freed-gb:
+    description: 'Space freed in GB'
+    value: ${{ steps.prune.outputs.freed }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Prune cache entries
+      id: prune
+      shell: bash
+      run: |
+        echo "Pruning cache entries older than ${{ inputs.max-age-days }} days..."
+        
+        CACHE_DIRS=(".cache" "node_modules/.cache" ".npm" ".pip/cache")
+        PRUNED_COUNT=0
+        SPACE_BEFORE=0
+        SPACE_AFTER=0
+        
+        # Calculate current cache size
+        for dir in "${CACHE_DIRS[@]}"; do
+          if [[ -d "$dir" ]]; then
+            SIZE=$(du -sm "$dir" 2>/dev/null | awk '{print $1}' || echo "0")
+            SPACE_BEFORE=$((SPACE_BEFORE + SIZE))
+          fi
+        done
+        
+        # Prune old entries
+        for dir in "${CACHE_DIRS[@]}"; do
+          if [[ -d "$dir" ]]; then
+            COUNT=$(find "$dir" -type f -mtime +${{ inputs.max-age-days }} -delete -print 2>/dev/null | wc -l || echo "0")
+            PRUNED_COUNT=$((PRUNED_COUNT + COUNT))
+          fi
+        done
+        
+        # Calculate space after pruning
+        for dir in "${CACHE_DIRS[@]}"; do
+          if [[ -d "$dir" ]]; then
+            SIZE=$(du -sm "$dir" 2>/dev/null | awk '{print $1}' || echo "0")
+            SPACE_AFTER=$((SPACE_AFTER + SIZE))
+          fi
+        done
+        
+        FREED_MB=$((SPACE_BEFORE - SPACE_AFTER))
+        FREED_GB=$((FREED_MB / 1024))
+        
+        echo "count=$PRUNED_COUNT" >> $GITHUB_OUTPUT
+        echo "freed=$FREED_GB" >> $GITHUB_OUTPUT
+        echo "Pruned $PRUNED_COUNT entries, freed ${FREED_GB}GB"

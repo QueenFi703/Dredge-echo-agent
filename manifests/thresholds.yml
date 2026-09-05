@@ -1,0 +1,44 @@
+# Defines when to care: thresholds for warnings and critical alerts
+
+thresholds:
+  disk_space:
+    description: "Free disk space thresholds"
+    warn: 10gb
+    critical: 5gb
+    action: "Prune caches and temporary files"
+    
+  memory:
+    description: "Available memory thresholds"
+    warn: 1000mb
+    critical: 500mb
+    action: "Reduce parallel processes"
+    
+  duration:
+    description: "Phase execution time limits"
+    warn: 15m
+    critical: 30m
+    action: "Review optimization opportunities"
+    
+  cache_size:
+    description: "Cache storage consumption"
+    warn: 5gb
+    critical: 10gb
+    action: "Prune old cache entries"
+    
+  artifact_size:
+    description: "Artifact storage per workflow"
+    warn: 500mb
+    critical: 1gb
+    action: "Review artifact retention policy"
+    
+  test_failures:
+    description: "Test failure thresholds"
+    warn: 1
+    critical: 5
+    action: "Block merge until resolved"
+    
+  coverage:
+    description: "Code coverage percentage"
+    warn: 70
+    critical: 60
+    action: "Add tests for uncovered code"

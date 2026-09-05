@@ -1,0 +1,84 @@
+name: 'Resource Check'
+description: 'Validates system has sufficient resources to continue'
+
+inputs:
+  min-disk-gb:
+    description: 'Minimum free disk space required'
+    default: '5'
+    required: false
+  min-memory-mb:
+    description: 'Minimum free memory required'
+    default: '500'
+    required: false
+  fail-mode:
+    description: 'hard (fail) or soft (warn)'
+    default: 'soft'
+    required: false
+
+outputs:
+  disk-available:
+    description: 'Free disk space in GB'
+    value: ${{ steps.disk.outputs.available }}
+  memory-available:
+    description: 'Free memory in MB'
+    value: ${{ steps.memory.outputs.available }}
+  status:
+    description: 'ok, warning, critical'
+    value: ${{ steps.status.outputs.result }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check disk space
+      id: disk
+      shell: bash
+      run: |
+        DISK_AVAILABLE=$(df -BG . | tail -1 | awk '{print $4}' | sed 's/G//')
+        echo "available=$DISK_AVAILABLE" >> $GITHUB_OUTPUT
+        echo "Disk available: ${DISK_AVAILABLE}GB (minimum: ${{ inputs.min-disk-gb }}GB)"
+        
+        if [[ $DISK_AVAILABLE -lt ${{ inputs.min-disk-gb }} ]]; then
+          echo "::warning::Low disk space: ${DISK_AVAILABLE}GB < ${{ inputs.min-disk-gb }}GB"
+          if [[ "${{ inputs.fail-mode }}" == "hard" ]]; then
+            echo "::error::Insufficient disk space"
+            exit 1
+          fi
+        fi
+        
+    - name: Check memory
+      id: memory
+      shell: bash
+      run: |
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          MEMORY_AVAILABLE=$(vm_stat | grep "Pages free" | awk '{print int($3 * 4096 / 1024 / 1024)}')
+        else
+          MEMORY_AVAILABLE=$(free -m | awk 'NR==2 {print $7}')
+        fi
+        echo "available=$MEMORY_AVAILABLE" >> $GITHUB_OUTPUT
+        echo "Memory available: ${MEMORY_AVAILABLE}MB (minimum: ${{ inputs.min-memory-mb }}MB)"
+        
+        if [[ $MEMORY_AVAILABLE -lt ${{ inputs.min-memory-mb }} ]]; then
+          echo "::warning::Low memory: ${MEMORY_AVAILABLE}MB < ${{ inputs.min-memory-mb }}MB"
+          if [[ "${{ inputs.fail-mode }}" == "hard" ]]; then
+            echo "::error::Insufficient memory"
+            exit 1
+          fi
+        fi
+        
+    - name: Determine status
+      id: status
+      shell: bash
+      run: |
+        DISK="${{ steps.disk.outputs.available }}"
+        MEMORY="${{ steps.memory.outputs.available }}"
+        
+        if [[ $DISK -lt ${{ inputs.min-disk-gb }} ]] || [[ $MEMORY -lt ${{ inputs.min-memory-mb }} ]]; then
+          echo "result=critical" >> $GITHUB_OUTPUT
+          echo "Status: CRITICAL"
+        elif [[ $DISK -lt $((${{ inputs.min-disk-gb }} * 2)) ]] || [[ $MEMORY -lt $((${{ inputs.min-memory-mb }} * 2)) ]]; then
+          echo "result=warning" >> $GITHUB_OUTPUT
+          echo "Status: WARNING"
+        else
+          echo "result=ok" >> $GITHUB_OUTPUT
+          echo "Status: OK"
+        fi

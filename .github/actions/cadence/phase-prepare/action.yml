@@ -1,0 +1,103 @@
+name: 'Phase Prepare'
+description: 'Preparation phase for workflow execution'
+
+inputs:
+  language:
+    description: 'Programming language (python, node, go, etc.)'
+    required: false
+  cache-key:
+    description: 'Cache key for dependencies'
+    required: false
+  install-dependencies:
+    description: 'Whether to install dependencies'
+    default: 'true'
+    required: false
+  
+outputs:
+  cache-hit:
+    description: 'Whether cache was restored'
+    value: ${{ steps.cache.outputs.cache-hit }}
+  preparation-status:
+    description: 'Preparation status (success, partial, failed)'
+    value: ${{ steps.status.outputs.result }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Restore cache
+      id: cache
+      if: inputs.cache-key != ''
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache
+          node_modules
+          .venv
+        key: ${{ inputs.language }}-${{ inputs.cache-key }}
+        restore-keys: |
+          ${{ inputs.language }}-
+        
+    - name: Install dependencies
+      id: install
+      if: inputs.install-dependencies == 'true'
+      shell: bash
+      run: |
+        echo "Installing dependencies for: ${{ inputs.language }}"
+        
+        case "${{ inputs.language }}" in
+          python)
+            if [[ -f "requirements.txt" ]]; then
+              pip install -r requirements.txt
+            fi
+            if [[ -f "pyproject.toml" ]]; then
+              pip install --quiet hatchling
+              pip install --quiet -e .
+            fi
+            ;;
+          node|javascript)
+            if [[ -f "package.json" ]]; then
+              npm install
+            fi
+            ;;
+          go)
+            if [[ -f "go.mod" ]]; then
+              go mod download
+            fi
+            ;;
+          *)
+            echo "Language not specified or not supported for auto-install"
+            ;;
+        esac
+        
+    - name: Determine status
+      id: status
+      shell: bash
+      run: |
+        if [[ "${{ steps.cache.outputs.cache-hit }}" == "true" ]]; then
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "Preparation complete: cache restored"
+        elif [[ "${{ inputs.install-dependencies }}" == "true" ]]; then
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "Preparation complete: dependencies installed"
+        else
+          echo "result=partial" >> $GITHUB_OUTPUT
+          echo "Preparation partial: no cache, no install"
+        fi
+        
+    - name: Collect metrics
+      id: metrics
+      uses: ./.github/actions/observability/metrics-collect
+      with:
+        phase: prepare
+        metric-type: resource
+        
+    - name: Generate summary
+      uses: ./.github/actions/observability/summary-generate
+      with:
+        phase: prepare
+        status: ${{ steps.status.outputs.result }}
+        metrics: ${{ steps.metrics.outputs.metrics-json }}
+        additional-info: |
+          **Language:** ${{ inputs.language }}
+          **Cache Hit:** ${{ steps.cache.outputs.cache-hit }}
+          **Dependencies Installed:** ${{ inputs.install-dependencies }}
