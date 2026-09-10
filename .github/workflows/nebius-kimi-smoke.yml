@@ -1,0 +1,46 @@
+name: Nebius Kimi Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/kimi-smoke-test
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nebius-kimi-smoke
+  cancel-in-progress: false
+
+jobs:
+  call-kimi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
+      NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
+      NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Validate Token Factory configuration
+        shell: bash
+        run: |
+          test -n "$NEBIUS_API_KEY" || { echo "NEBIUS_API_KEY secret is missing"; exit 1; }
+          test -n "$NEBIUS_MODEL" || { echo "NEBIUS_MODEL variable is missing"; exit 1; }
+          test -n "$NEBIUS_BASE_URL" || { echo "NEBIUS_BASE_URL variable is missing"; exit 1; }
+
+      - name: Install Nebius client
+        run: python -m pip install -e ".[nebius]"
+
+      - name: Call Kimi through Token Factory
+        run: python scripts/smoke_nebius.py
