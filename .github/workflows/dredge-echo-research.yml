@@ -31,11 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
       TAVILY_PROJECT: ${{ vars.TAVILY_PROJECT || 'dredge-echo-agent' }}
-      NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
       NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
-      NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL }}
+      NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL || 'https://api.tokenfactory.nebius.com/v1' }}
       RESEARCH_QUESTION: ${{ inputs.question || 'What are the latest practical developments in agentic AI infrastructure?' }}
 
     steps:
@@ -50,8 +48,12 @@ jobs:
 
       - name: Validate live research configuration
         shell: bash
+        env:
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
         run: |
           test -n "$TAVILY_API_KEY" || { echo "TAVILY_API_KEY secret is missing"; exit 1; }
+          test -n "$TAVILY_PROJECT" || { echo "TAVILY_PROJECT variable is missing"; exit 1; }
           test -n "$NEBIUS_API_KEY" || { echo "NEBIUS_API_KEY secret is missing"; exit 1; }
           test -n "$NEBIUS_MODEL" || { echo "NEBIUS_MODEL variable is missing"; exit 1; }
           test -n "$NEBIUS_BASE_URL" || { echo "NEBIUS_BASE_URL variable is missing"; exit 1; }
@@ -73,6 +75,9 @@ jobs:
 
       - name: Run live Tavily to Token Factory research cycle
         shell: bash
+        env:
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
         run: |
           echo "Research question: $RESEARCH_QUESTION"
           echo "Run started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
