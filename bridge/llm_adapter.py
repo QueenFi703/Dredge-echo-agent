@@ -145,11 +145,15 @@ class LLMAdapter:
 
     def _nebius_call(self, prompt: str) -> str:
         """Call a Nebius Token Factory model through its OpenAI-compatible API."""
-        api_key = os.environ.get("NEBIUS_API_KEY")
-        model = self._model or os.environ.get("NEBIUS_MODEL")
-        base_url = os.environ.get(
-            "NEBIUS_BASE_URL", "https://api.tokenfactory.nebius.com/v1"
-        ).rstrip("/")
+        api_key = (os.environ.get("NEBIUS_API_KEY") or "").strip()
+        model = (self._model or os.environ.get("NEBIUS_MODEL") or "").strip()
+        base_url = (
+            os.environ.get(
+                "NEBIUS_BASE_URL", "https://api.tokenfactory.nebius.com/v1"
+            )
+            .strip()
+            .rstrip("/")
+        )
 
         if not api_key:
             raise LLMBackendError("NEBIUS_API_KEY is not configured")

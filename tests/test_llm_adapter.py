@@ -36,8 +36,9 @@ class NebiusBackendTests(unittest.TestCase):
     def test_nebius_uses_token_factory_endpoint_model_and_key(self):
         fake_module = types.SimpleNamespace(OpenAI=_FakeOpenAI)
         env = {
-            "NEBIUS_API_KEY": "test-key",
-            "NEBIUS_MODEL": "org/test-model",
+            "NEBIUS_API_KEY": "test-key\n",
+            "NEBIUS_MODEL": "org/test-model\r\n",
+            "NEBIUS_BASE_URL": "https://api.tokenfactory.nebius.com/v1/\n",
         }
 
         with patch.dict(os.environ, env, clear=True), patch.dict(
