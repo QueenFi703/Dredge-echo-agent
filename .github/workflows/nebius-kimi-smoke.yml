@@ -17,10 +17,6 @@ jobs:
   call-kimi:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
-      NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
-      NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL }}
 
     steps:
       - name: Check out repository
@@ -34,13 +30,19 @@ jobs:
 
       - name: Validate Token Factory configuration
         shell: bash
+        env:
+          NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
+          NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
         run: |
           test -n "$NEBIUS_API_KEY" || { echo "NEBIUS_API_KEY secret is missing"; exit 1; }
           test -n "$NEBIUS_MODEL" || { echo "NEBIUS_MODEL variable is missing"; exit 1; }
-          test -n "$NEBIUS_BASE_URL" || { echo "NEBIUS_BASE_URL variable is missing"; exit 1; }
 
       - name: Install Nebius client
         run: python -m pip install -e ".[nebius]"
 
       - name: Call Kimi through Token Factory
+        env:
+          NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
+          NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
+          NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL || 'https://api.tokenfactory.nebius.com/v1' }}
         run: python scripts/smoke_nebius.py
