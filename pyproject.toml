@@ -25,5 +25,8 @@ classifiers = [
 [project.scripts]
 aster = "language.runtime.interpreter:main"
 
+[project.optional-dependencies]
+nebius = ["openai>=1.0,<3"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["language", "compiler", "bridge"]
