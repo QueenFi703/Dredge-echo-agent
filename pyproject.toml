@@ -27,6 +27,11 @@ aster = "language.runtime.interpreter:main"
 
 [project.optional-dependencies]
 nebius = ["openai>=1.0,<3"]
+research = ["tavily-python>=0.7,<1"]
+agent = [
+    "openai>=1.0,<3",
+    "tavily-python>=0.7,<1",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["language", "compiler", "bridge"]
