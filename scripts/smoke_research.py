@@ -30,14 +30,22 @@ def main() -> None:
     )
     result = agent.research(args.question, max_results=args.max_results)
 
+    sources = result.evidence["sources"]
+    answer = result.answer.strip()
+    if not sources:
+        raise RuntimeError("Live research returned no sources; grounded demo failed")
+    if not answer:
+        raise RuntimeError("Nebius returned an empty answer; grounded demo failed")
+
     print(f"Dredge Echo research started: {started_at}")
     print(f"Nebius model: {model}")
     print(f"Tavily query: {result.evidence['query']}")
-    print(f"Sources: {len(result.evidence['sources'])}")
-    for index, source in enumerate(result.evidence["sources"], start=1):
+    print(f"Sources: {len(sources)}")
+    for index, source in enumerate(sources, start=1):
         print(f"  {index}. {source.get('title') or '(untitled)'} - {source.get('url')}")
     print("\nGrounded answer:\n")
-    print(result.answer.strip())
+    print(answer)
+    print(f"\nDredge Echo research completed: {datetime.now(timezone.utc).isoformat()}")
 
 
 if __name__ == "__main__":
