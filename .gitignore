@@ -28,3 +28,8 @@ Thumbs.db
 
 # Local test artifacts
 act-*.json
+
+# Local secrets (keep the documented template)
+.env
+.env.*
+!.env.example

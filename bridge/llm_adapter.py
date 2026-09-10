@@ -22,6 +22,7 @@ Usage::
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Callable, Dict, Optional
 
 
@@ -42,7 +43,7 @@ class LLMAdapter:
     ----------
     backend:
         Name of the LLM backend to use.  Supported values: ``"dry_run"``
-        (default), ``"openai"``, ``"anthropic"``, ``"local"``.
+        (default), ``"nebius"``, ``"openai"``, ``"anthropic"``, ``"local"``.
     model:
         Optional model name forwarded to the backend (e.g. ``"gpt-4o"``).
     prompt_template:
@@ -109,6 +110,8 @@ class LLMAdapter:
     def _resolve_backend(self, name: str) -> Callable[[str], str]:
         if name == "dry_run":
             return self._dry_run
+        if name == "nebius":
+            return self._nebius_call
         if name == "openai":
             return self._openai_call
         if name == "anthropic":
@@ -126,13 +129,12 @@ class LLMAdapter:
         """Return the prompt unchanged (no API call)."""
         return f"[DRY RUN]\n{prompt}"
 
-    @staticmethod
-    def _openai_call(prompt: str) -> str:
+    def _openai_call(self, prompt: str) -> str:
         try:
             import openai  # type: ignore
             client = openai.OpenAI()
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model=self._model or "gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
             )
             return response.choices[0].message.content or ""
@@ -140,6 +142,35 @@ class LLMAdapter:
             raise LLMBackendError(
                 "openai package is not installed. Run: pip install openai"
             )
+
+    def _nebius_call(self, prompt: str) -> str:
+        """Call a Nebius Token Factory model through its OpenAI-compatible API."""
+        api_key = os.environ.get("NEBIUS_API_KEY")
+        model = self._model or os.environ.get("NEBIUS_MODEL")
+        base_url = os.environ.get(
+            "NEBIUS_BASE_URL", "https://api.tokenfactory.nebius.com/v1"
+        ).rstrip("/")
+
+        if not api_key:
+            raise LLMBackendError("NEBIUS_API_KEY is not configured")
+        if not model:
+            raise LLMBackendError(
+                "A Nebius model is required; pass model=... or set NEBIUS_MODEL"
+            )
+
+        try:
+            import openai  # type: ignore
+        except ImportError as exc:
+            raise LLMBackendError(
+                "openai package is not installed. Run: pip install 'aster-lang[nebius]'"
+            ) from exc
+
+        client = openai.OpenAI(api_key=api_key, base_url=base_url)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content or ""
 
     @staticmethod
     def _anthropic_call(prompt: str) -> str:

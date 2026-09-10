@@ -20,6 +20,35 @@ Not code that works once.
 
 ## Quick Start
 
+### Nebius Token Factory
+
+The LLM bridge can run against Nebius Token Factory's OpenAI-compatible API.
+Install the optional client, copy the environment template, and choose a model
+from the Token Factory catalog:
+
+```bash
+pip install -e ".[nebius]"
+cp .env.example .env
+```
+
+Set `NEBIUS_API_KEY` and `NEBIUS_MODEL` in your shell or deployment secret
+manager, then initialize the bridge with `backend="nebius"`:
+
+```python
+from bridge.llm_adapter import LLMAdapter
+
+agent = LLMAdapter(backend="nebius")
+response = agent.generate(
+    "distill_skill",
+    source="execution_trace",
+    target="verified_skill_candidate",
+    source_value={"status": "success", "steps": ["inspect", "execute", "verify"]},
+)
+```
+
+`NEBIUS_BASE_URL` defaults to `https://api.tokenfactory.nebius.com/v1` and can
+be overridden for a compatible dedicated endpoint. Never commit the API key.
+
 ### For New Contributors
 
 1. **Read the mental model:** [docs/onboarding/MENTAL_MODEL.md](docs/onboarding/MENTAL_MODEL.md)
