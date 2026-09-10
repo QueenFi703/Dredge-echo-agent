@@ -48,7 +48,7 @@ class TavilySearchAdapterTests(unittest.TestCase):
 
         client = _FakeTavilyClient.clients[0]
         self.assertEqual(client.options["api_key"], "tvly-test")
-        self.assertEqual(client.options["project"], "dredge-echo-agent")
+        self.assertEqual(client.options["project_id"], "dredge-echo-agent")
         self.assertEqual(client.calls[0]["max_results"], 3)
         self.assertTrue(client.calls[0]["include_answer"])
         self.assertEqual(result["sources"][0]["url"], "https://example.com")
