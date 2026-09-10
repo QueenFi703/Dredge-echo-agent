@@ -29,7 +29,7 @@ class TavilySearchAdapter:
 
         kwargs: Dict[str, Any] = {"api_key": self._api_key}
         if self._project:
-            kwargs["project"] = self._project
+            kwargs["project_id"] = self._project
         self._client = TavilyClient(**kwargs)
 
     def search(self, query: str, *, max_results: int = 5) -> Dict[str, Any]:
