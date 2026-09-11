@@ -19,6 +19,15 @@ class _FakeCompletions:
         )
 
 
+class _FakeResponses:
+    def __init__(self, calls):
+        self._calls = calls
+
+    def create(self, **kwargs):
+        self._calls.append(kwargs)
+        return types.SimpleNamespace(output_text="astra response")
+
+
 class _FakeOpenAI:
     clients = []
 
@@ -26,7 +35,59 @@ class _FakeOpenAI:
         self.options = kwargs
         self.calls = []
         self.chat = types.SimpleNamespace(completions=_FakeCompletions(self.calls))
+        self.responses = _FakeResponses(self.calls)
         self.__class__.clients.append(self)
+
+
+class OpenAIBackendTests(unittest.TestCase):
+    def setUp(self):
+        _FakeOpenAI.clients.clear()
+
+    def test_openai_uses_astra_responses_api_by_default(self):
+        fake_module = types.SimpleNamespace(OpenAI=_FakeOpenAI)
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-openai-key"}, clear=True), patch.dict(
+            sys.modules, {"openai": fake_module}
+        ):
+            result = LLMAdapter(backend="openai").generate(
+                "research_and_reason", source_value="evidence"
+            )
+
+        self.assertEqual(result, "astra response")
+        client = _FakeOpenAI.clients[0]
+        self.assertEqual(client.options["api_key"], "test-openai-key")
+        self.assertEqual(client.calls[0]["model"], "gpt-6-astra")
+        self.assertEqual(client.calls[0]["reasoning"], {"effort": "low"})
+        self.assertIn("Action: research_and_reason", client.calls[0]["input"])
+
+    def test_openai_accepts_model_and_reasoning_overrides(self):
+        fake_module = types.SimpleNamespace(OpenAI=_FakeOpenAI)
+        env = {
+            "OPENAI_API_KEY": "test-openai-key",
+            "OPENAI_MODEL": "env-model",
+            "OPENAI_REASONING_EFFORT": "high",
+        }
+        with patch.dict(os.environ, env, clear=True), patch.dict(
+            sys.modules, {"openai": fake_module}
+        ):
+            LLMAdapter(backend="openai", model="explicit-model").generate("infer")
+
+        call = _FakeOpenAI.clients[0].calls[0]
+        self.assertEqual(call["model"], "explicit-model")
+        self.assertEqual(call["reasoning"], {"effort": "high"})
+
+    def test_openai_requires_api_key(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(LLMBackendError, "OPENAI_API_KEY"):
+                LLMAdapter(backend="openai").generate("infer")
+
+    def test_openai_rejects_invalid_reasoning_effort(self):
+        env = {
+            "OPENAI_API_KEY": "test-openai-key",
+            "OPENAI_REASONING_EFFORT": "minimal",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaisesRegex(LLMBackendError, "OPENAI_REASONING_EFFORT"):
+                LLMAdapter(backend="openai").generate("infer")
 
 
 class NebiusBackendTests(unittest.TestCase):
