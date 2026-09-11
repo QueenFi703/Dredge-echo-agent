@@ -32,6 +32,7 @@ agent = [
     "openai>=1.0,<3",
     "tavily-python>=0.7,<1",
 ]
+demo = ["gradio>=5,<7"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["language", "compiler", "bridge"]
