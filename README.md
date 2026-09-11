@@ -119,7 +119,7 @@ Never commit API keys. In Hugging Face Spaces, add the keys under **Secrets** an
 python app.py
 ```
 
-Open the local Gradio URL printed in the terminal, enter a current research question, and select **Run grounded research**.
+Open the local Gradio URL printed in the terminal, enter a current research question, and select **Research**.
 
 A strong demo question is:
 
@@ -131,7 +131,7 @@ A strong demo question is:
 from bridge.research_agent import ResearchAgent
 from bridge.search_adapter import TavilySearchAdapter
 from bridge.llm_adapter import LLMAdapter
-from bridge.nemotron_verifier import NemotronVerifier
+from bridge.verification import NemotronVerifier
 
 search = TavilySearchAdapter()
 kimi = LLMAdapter(backend="nebius")
