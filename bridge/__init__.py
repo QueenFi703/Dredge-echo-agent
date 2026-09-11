@@ -1,14 +1,26 @@
 # Bridge package
+from .control_plane import (
+    DredgeControlPlane,
+    IntelligenceState,
+    InvestigationSignals,
+    OrchestrationMode,
+    ReasoningDepth,
+)
 from .llm_adapter import LLMAdapter, LLMBackendError
 from .research_agent import ResearchAgent, ResearchResult
 from .search_adapter import SearchBackendError, TavilySearchAdapter
 from .verification import NemotronVerifier, VerificationError
 
 __all__ = [
+    "DredgeControlPlane",
+    "IntelligenceState",
+    "InvestigationSignals",
     "LLMAdapter",
     "LLMBackendError",
     "NemotronVerifier",
+    "OrchestrationMode",
     "PythonAdapter",
+    "ReasoningDepth",
     "ResearchAgent",
     "ResearchResult",
     "SearchBackendError",
