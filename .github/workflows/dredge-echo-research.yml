@@ -10,7 +10,7 @@ on:
         type: string
   push:
     branches:
-      - feat/dredge-echo-research-workflow
+      - main
     paths:
       - ".github/workflows/dredge-echo-research.yml"
       - "bridge/**"
@@ -33,6 +33,7 @@ jobs:
     env:
       TAVILY_PROJECT: ${{ vars.TAVILY_PROJECT || 'dredge-echo-agent' }}
       NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
+      NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}
       NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL || 'https://api.tokenfactory.nebius.com/v1' }}
       RESEARCH_QUESTION: ${{ inputs.question || 'What are the latest practical developments in agentic AI infrastructure?' }}
 
@@ -56,9 +57,11 @@ jobs:
           test -n "$TAVILY_PROJECT" || { echo "TAVILY_PROJECT variable is missing"; exit 1; }
           test -n "$NEBIUS_API_KEY" || { echo "NEBIUS_API_KEY secret is missing"; exit 1; }
           test -n "$NEBIUS_MODEL" || { echo "NEBIUS_MODEL variable is missing"; exit 1; }
+          test -n "$NVIDIA_MODEL" || { echo "NVIDIA_MODEL variable is missing"; exit 1; }
           test -n "$NEBIUS_BASE_URL" || { echo "NEBIUS_BASE_URL variable is missing"; exit 1; }
           echo "Live research configuration is present."
-          echo "Nebius model: $NEBIUS_MODEL"
+          echo "Kimi model: $NEBIUS_MODEL"
+          echo "Nemotron model: $NVIDIA_MODEL"
           echo "Tavily project: $TAVILY_PROJECT"
           python - <<'PY'
           import os
@@ -71,7 +74,7 @@ jobs:
         run: python -m pip install -e ".[agent]"
 
       - name: Run retrieval and orchestration unit tests
-        run: python -m unittest tests.test_search_adapter tests.test_research_agent
+        run: python -m unittest tests.test_search_adapter tests.test_research_agent tests.test_verification tests.test_workflow_security
 
       - name: Run live Tavily to Token Factory research cycle
         shell: bash
