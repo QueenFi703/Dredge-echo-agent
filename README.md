@@ -1,4 +1,57 @@
-# Fractal Operational Coherence
+---
+title: Dredge Echo
+emoji: 🔎
+colorFrom: blue
+colorTo: green
+sdk: gradio
+sdk_version: 5.50.0
+app_file: app.py
+pinned: false
+license: mit
+---
+
+# Dredge Echo
+
+**Dredge Echo doesn’t just answer. It shows what it knows, how it knows it, and where the evidence ends.**
+
+Dredge Echo is a grounded research agent for AI builders who need current, verifiable answers. Tavily retrieves live evidence, Kimi performs the primary synthesis through Nebius Token Factory, and NVIDIA Nemotron assesses citation support. The demo exposes the answer, sources, evidence status, and an expandable per-stage trace. If retrieval returns no evidence, it says **“Insufficient evidence.”**
+
+## Public demo configuration
+
+Install and launch the same app used by the Hugging Face Space:
+
+```bash
+pip install -r requirements.txt
+python app.py
+```
+
+Configure these as Hugging Face Space **Secrets**:
+
+- `TAVILY_API_KEY`
+- `NEBIUS_API_KEY`
+
+Configure these as Space **Variables**:
+
+- `TAVILY_PROJECT=dredge-echo-agent`
+- `NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1`
+- `NEBIUS_MODEL=moonshotai/Kimi-K3`
+- `NVIDIA_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`
+
+The app never renders credentials or raw provider errors. Kimi remains the primary reasoning model; Nemotron is the evidence assessor and triggers Kimi arbitration when it recommends corrections.
+
+## Verified pipeline
+
+The GitHub Actions workflow `Dredge Echo Research Demo` exercises:
+
+```text
+Tavily retrieval -> Kimi synthesis -> Nemotron verification -> grounded answer -> trace
+```
+
+Run it from `.github/workflows/dredge-echo-research.yml`. The workflow fails clearly when required configuration is missing and prints only non-secret execution evidence.
+
+---
+
+## Fractal Operational Coherence
 
 **Build systems that remain coherent under entropy and teach coherence through use.**
 
