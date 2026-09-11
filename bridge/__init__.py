@@ -7,6 +7,7 @@ from .control_plane import (
     OrchestrationMode,
     ReasoningDepth,
 )
+from .execution_graph import ExecutionGraph, ExecutionNode, GraphMutation, NodeStatus
 from .llm_adapter import LLMAdapter, LLMBackendError
 from .research_agent import ResearchAgent, ResearchResult
 from .search_adapter import SearchBackendError, TavilySearchAdapter
@@ -16,12 +17,16 @@ __all__ = [
     "AdaptiveResearchAgent",
     "AdaptiveResearchResult",
     "DredgeControlPlane",
+    "ExecutionGraph",
+    "ExecutionNode",
+    "GraphMutation",
     "IntelligenceEvent",
     "IntelligenceState",
     "InvestigationSignals",
     "LLMAdapter",
     "LLMBackendError",
     "NemotronVerifier",
+    "NodeStatus",
     "OrchestrationMode",
     "PythonAdapter",
     "ReasoningDepth",
