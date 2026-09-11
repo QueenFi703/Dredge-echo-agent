@@ -50,9 +50,10 @@ class TavilySearchAdapter:
 
         raw_results = response.get("results") or []
         sources: List[Dict[str, Any]] = []
-        for item in raw_results:
+        for index, item in enumerate(raw_results, start=1):
             sources.append(
                 {
+                    "id": f"source-{index}",
                     "title": item.get("title"),
                     "url": item.get("url"),
                     "content": item.get("content"),
