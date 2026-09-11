@@ -59,7 +59,7 @@ class OpenAIBackendTests(unittest.TestCase):
         self.assertEqual(client.calls[0]["reasoning"], {"effort": "low"})
         self.assertIn("Action: research_and_reason", client.calls[0]["input"])
 
-    def test_openai_accepts_model_and_reasoning_overrides(self):
+    def test_openai_accepts_model_and_environment_reasoning_overrides(self):
         fake_module = types.SimpleNamespace(OpenAI=_FakeOpenAI)
         env = {
             "OPENAI_API_KEY": "test-openai-key",
@@ -75,6 +75,21 @@ class OpenAIBackendTests(unittest.TestCase):
         self.assertEqual(call["model"], "explicit-model")
         self.assertEqual(call["reasoning"], {"effort": "high"})
 
+    def test_per_call_reasoning_effort_overrides_environment(self):
+        fake_module = types.SimpleNamespace(OpenAI=_FakeOpenAI)
+        env = {
+            "OPENAI_API_KEY": "test-openai-key",
+            "OPENAI_REASONING_EFFORT": "low",
+        }
+        with patch.dict(os.environ, env, clear=True), patch.dict(
+            sys.modules, {"openai": fake_module}
+        ):
+            LLMAdapter(backend="openai").generate("infer", reasoning_effort="xhigh")
+
+        self.assertEqual(
+            _FakeOpenAI.clients[0].calls[0]["reasoning"], {"effort": "xhigh"}
+        )
+
     def test_openai_requires_api_key(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(LLMBackendError, "OPENAI_API_KEY"):
@@ -86,7 +101,7 @@ class OpenAIBackendTests(unittest.TestCase):
             "OPENAI_REASONING_EFFORT": "minimal",
         }
         with patch.dict(os.environ, env, clear=True):
-            with self.assertRaisesRegex(LLMBackendError, "OPENAI_REASONING_EFFORT"):
+            with self.assertRaisesRegex(LLMBackendError, "reasoning effort"):
                 LLMAdapter(backend="openai").generate("infer")
 
 
