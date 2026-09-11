@@ -1,4 +1,5 @@
 # Bridge package
+from .adaptive_agent import AdaptiveResearchAgent, AdaptiveResearchResult, IntelligenceEvent
 from .control_plane import (
     DredgeControlPlane,
     IntelligenceState,
@@ -12,7 +13,10 @@ from .search_adapter import SearchBackendError, TavilySearchAdapter
 from .verification import NemotronVerifier, VerificationError
 
 __all__ = [
+    "AdaptiveResearchAgent",
+    "AdaptiveResearchResult",
     "DredgeControlPlane",
+    "IntelligenceEvent",
     "IntelligenceState",
     "InvestigationSignals",
     "LLMAdapter",
