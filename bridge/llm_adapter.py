@@ -59,9 +59,19 @@ class LLMAdapter:
         source: str = "source",
         target: str = "target",
         source_value: Any = None,
+        *,
+        reasoning_effort: Optional[str] = None,
     ) -> str:
-        """Send the prompt to the configured backend and return the response."""
+        """Send the prompt to the configured backend and return the response.
+
+        ``reasoning_effort`` is intentionally a per-call control.  OpenAI/Astra
+        consumes it directly, which lets Dredge deepen or collapse reasoning
+        during one investigation without mutating global process state. Other
+        backends ignore the argument and retain their existing behavior.
+        """
         prompt = self.build_prompt(action, source, target, source_value)
+        if self._backend == "openai":
+            return self._openai_call(prompt, reasoning_effort=reasoning_effort)
         return self._call_fn(prompt)
 
     def _resolve_backend(self, name: str) -> Callable[[str], str]:
@@ -81,25 +91,28 @@ class LLMAdapter:
     def _dry_run(prompt: str) -> str:
         return f"[DRY RUN]\n{prompt}"
 
-    def _openai_call(self, prompt: str) -> str:
+    def _openai_call(self, prompt: str, *, reasoning_effort: Optional[str] = None) -> str:
         """Call GPT-6 Astra through OpenAI's Responses API.
 
         Environment variables:
             OPENAI_API_KEY: required API credential.
             OPENAI_MODEL: optional model override; defaults to gpt-6-astra.
-            OPENAI_REASONING_EFFORT: low, medium, high, xhigh, or max.
+            OPENAI_REASONING_EFFORT: fallback effort when a call does not
+                explicitly provide one.
         """
         api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
         model = (self._model or os.environ.get("OPENAI_MODEL") or "gpt-6-astra").strip()
-        reasoning_effort = (
-            os.environ.get("OPENAI_REASONING_EFFORT") or "low"
+        effort = (
+            reasoning_effort
+            or os.environ.get("OPENAI_REASONING_EFFORT")
+            or "low"
         ).strip().lower()
 
         if not api_key:
             raise LLMBackendError("OPENAI_API_KEY is not configured")
-        if reasoning_effort not in {"low", "medium", "high", "xhigh", "max"}:
+        if effort not in {"low", "medium", "high", "xhigh", "max"}:
             raise LLMBackendError(
-                "OPENAI_REASONING_EFFORT must be one of: low, medium, high, xhigh, max"
+                "reasoning effort must be one of: low, medium, high, xhigh, max"
             )
 
         try:
@@ -113,7 +126,7 @@ class LLMAdapter:
         response = client.responses.create(
             model=model,
             input=prompt,
-            reasoning={"effort": reasoning_effort},
+            reasoning={"effort": effort},
         )
         return response.output_text or ""
 
