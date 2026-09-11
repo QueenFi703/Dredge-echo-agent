@@ -12,435 +12,221 @@ license: mit
 
 # Dredge Echo
 
-**Dredge Echo doesn’t just answer. It shows what it knows, how it knows it, and where the evidence ends.**
+> **Ask the live web. Hear the evidence answer back.**
 
-Dredge Echo is a grounded research agent for AI builders who need current, verifiable answers. Tavily retrieves live evidence, Kimi performs the primary synthesis through Nebius Token Factory, and NVIDIA Nemotron assesses citation support. The demo exposes the answer, sources, evidence status, and an expandable per-stage trace. If retrieval returns no evidence, it says **“Insufficient evidence.”**
+Dredge Echo is a grounded, multi-model research agent built for people who need more than a fluent answer. It retrieves current evidence, drafts a source-grounded response, challenges the material claims, and shows the trace behind the result.
 
-## Public demo configuration
+**It does not just answer. It shows what it knows, how it knows it, and where the evidence ends.**
 
-Install and launch the same app used by the Hugging Face Space:
+## The signal path
+
+```text
+Question
+  ↓
+Tavily — Scout
+  ↓
+Kimi on Nebius Token Factory — Architect
+  ↓
+NVIDIA Nemotron — Challenger
+  ↓
+Dredge Echo — Arbiter
+  ↓
+Grounded answer + sources + evidence status + trace
+```
+
+Each model has one job:
+
+| Layer | Role | Responsibility |
+|---|---|---|
+| **Tavily** | Scout | Retrieves current, relevant web evidence at runtime. |
+| **Kimi** | Architect | Produces the first grounded synthesis from the retrieved evidence. |
+| **NVIDIA Nemotron** | Challenger | Checks material claims for support, contradiction, missing context, and excess certainty. |
+| **Dredge Echo** | Arbiter | Reconciles the critique with the evidence and returns the final answer. |
+
+Nemotron is intentionally not used as a second answer generator. Its independent role is to pressure-test Kimi's draft. When it recommends corrections, Dredge Echo invokes Kimi again to arbitrate the disputed claims against the source packet.
+
+## Why Dredge Echo exists
+
+Search tools can find fresh information. Language models can explain it beautifully. The dangerous gap lives between those two moments: a polished answer may still overreach beyond its evidence.
+
+Dredge Echo turns that gap into a visible part of the product. A user can inspect:
+
+- the final grounded answer;
+- the retrieved sources;
+- verification counts for supported, unsupported, and contradicted claims;
+- whether arbitration revised the answer;
+- stage-level latency and model identity;
+- a clear **“Insufficient evidence”** result when retrieval cannot support an answer.
+
+That is the echo: the answer returns with the shape of its evidence still audible.
+
+## What makes it different
+
+- **Separation of duties:** retrieval, synthesis, verification, and arbitration are distinct stages.
+- **Evidence before eloquence:** no evidence means no manufactured certainty.
+- **Challenge, not duplication:** Nemotron evaluates claims instead of merely rewriting the draft.
+- **Inspectable reasoning path:** the UI exposes a compact per-stage trace without leaking credentials or raw provider errors.
+- **Graceful failure:** missing configuration and provider failures become safe, understandable states.
+- **Model flexibility:** OpenAI-compatible adapters keep the orchestration portable while the demo runs through Nebius Token Factory.
+
+## Built for the Nebius x NVIDIA Global AI Hackathon
+
+Dredge Echo uses **Nebius Token Factory** as the inference gateway and **NVIDIA Nemotron 3 Nano 30B A3B** as its evidence critic.
+
+The Nano variant fits the critic role: verification calls should be fast and economical enough to run after every synthesis, while still being capable of structured claim-level review. Kimi remains the primary synthesizer; Nemotron adds an independent adversarial pass.
+
+Tavily is a functional runtime component, not a decorative integration. Every live research request begins with a Tavily retrieval call whose normalized evidence is passed downstream to both synthesis and verification.
+
+## Run the demo
+
+### 1. Install
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+On Windows PowerShell, activate with:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+### 2. Configure
+
+Set the following as secrets in your local environment or deployment platform:
+
+```bash
+export TAVILY_API_KEY="your-tavily-key"
+export NEBIUS_API_KEY="your-nebius-key"
+```
+
+Set the model and endpoint configuration:
+
+```bash
+export TAVILY_PROJECT="dredge-echo-agent"
+export NEBIUS_BASE_URL="https://api.tokenfactory.nebius.com/v1"
+export NEBIUS_MODEL="moonshotai/Kimi-K3"
+export NVIDIA_MODEL="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+```
+
+Never commit API keys. In Hugging Face Spaces, add the keys under **Secrets** and the non-sensitive configuration under **Variables**.
+
+### 3. Launch
+
+```bash
 python app.py
 ```
 
-Configure these as Hugging Face Space **Secrets**:
+Open the local Gradio URL printed in the terminal, enter a current research question, and select **Research**.
 
-- `TAVILY_API_KEY`
-- `NEBIUS_API_KEY`
+A strong demo question is:
 
-Configure these as Space **Variables**:
+> What are the most important recent developments in open-source AI agents, and which claims are strongly supported by current sources?
 
-- `TAVILY_PROJECT=dredge-echo-agent`
-- `NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1`
-- `NEBIUS_MODEL=moonshotai/Kimi-K3`
-- `NVIDIA_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`
-
-The app never renders credentials or raw provider errors. Kimi remains the primary reasoning model; Nemotron is the evidence assessor and triggers Kimi arbitration when it recommends corrections.
-
-## Verified pipeline
-
-The GitHub Actions workflow `Dredge Echo Research Demo` exercises:
-
-```text
-Tavily retrieval -> Kimi synthesis -> Nemotron verification -> grounded answer -> trace
-```
-
-Run it from `.github/workflows/dredge-echo-research.yml`. The workflow fails clearly when required configuration is missing and prints only non-secret execution evidence.
-
----
-
-## Fractal Operational Coherence
-
-**Build systems that remain coherent under entropy and teach coherence through use.**
-
----
-
-## What Is This?
-
-This repository implements a **fractal architecture** for GitHub Actions workflows that:
-
-- ✅ Remains **coherent** across substrates (GitHub Actions, Docker, local machines)
-- ✅ Handles **entropy** gracefully (disk exhaustion, memory pressure, network failures)
-- ✅ **Teaches** through structure (learn by living in the system)
-- ✅ **Scales** through patterns that repeat at every level
-
-Not code that works once.  
-**Structure that holds its shape.**
-
----
-
-## Quick Start
-
-### Nebius Token Factory
-
-The LLM bridge can run against Nebius Token Factory's OpenAI-compatible API.
-Install the optional client, copy the environment template, and choose a model
-from the Token Factory catalog:
-
-```bash
-pip install -e ".[nebius]"
-cp .env.example .env
-```
-
-Set `NEBIUS_API_KEY` and `NEBIUS_MODEL` in your shell or deployment secret
-manager, then initialize the bridge with `backend="nebius"`:
+## Use the research agent in Python
 
 ```python
+from bridge.research_agent import ResearchAgent
+from bridge.search_adapter import TavilySearchAdapter
 from bridge.llm_adapter import LLMAdapter
+from bridge.verification import NemotronVerifier
 
-agent = LLMAdapter(backend="nebius")
-response = agent.generate(
-    "distill_skill",
-    source="execution_trace",
-    target="verified_skill_candidate",
-    source_value={"status": "success", "steps": ["inspect", "execute", "verify"]},
+search = TavilySearchAdapter()
+kimi = LLMAdapter(backend="nebius")
+critic = LLMAdapter(backend="nebius", model="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B")
+
+agent = ResearchAgent(
+    search=search,
+    llm=kimi,
+    verifier=NemotronVerifier(critic),
+    arbitrator=kimi,
 )
+
+result = agent.research("What changed, and what evidence supports it?")
+print(result["answer"])
+print(result["sources"])
+print(result["trace"])
 ```
 
-`NEBIUS_BASE_URL` defaults to `https://api.tokenfactory.nebius.com/v1` and can
-be overridden for a compatible dedicated endpoint. Never commit the API key.
+## Verification contract
 
-### For New Contributors
+Nemotron evaluates each material claim using structured statuses:
 
-1. **Read the mental model:** [docs/onboarding/MENTAL_MODEL.md](docs/onboarding/MENTAL_MODEL.md)
-2. **Explore a workflow:** [.github/workflows/ci.yml](.github/workflows/ci.yml)
-3. **See the pattern:** [.github/workflows/_template.yml](.github/workflows/_template.yml)
-4. **Start contributing:** [docs/onboarding/CONTRIBUTING.md](docs/onboarding/CONTRIBUTING.md)
+- `supported` — the evidence directly backs the claim;
+- `unsupported` — the retrieved packet does not establish the claim;
+- `contradicted` — the evidence conflicts with the claim.
 
-### For Operators
+Dredge Echo records the counts, preserves the source trail, and routes corrections through arbitration. This makes verification an executable stage of the system rather than a sentence in the prompt.
 
-1. **When things break:** [docs/operations/RUNBOOK.md](docs/operations/RUNBOOK.md)
-2. **How to debug:** Check metrics in `.metrics/` directory
-3. **System health:** Run `bash scripts/core/health-check.sh`
+## Test and verify
 
-### For Architects
+Run the automated test suite:
 
-1. **Why this exists:** [docs/architecture/PHILOSOPHY.md](docs/architecture/PHILOSOPHY.md)
-2. **Governing principles:** [docs/architecture/PRINCIPLES.md](docs/architecture/PRINCIPLES.md)
-3. **Recurring patterns:** [docs/architecture/PATTERNS.md](docs/architecture/PATTERNS.md)
-4. **Decision history:** [docs/architecture/DECISION_LOG.md](docs/architecture/DECISION_LOG.md)
-
----
-
-## The Core Idea
-
-Every workflow follows the same rhythm:
-
-```
-Init → Prepare → Execute → Report → Cleanup → Seal
-```
-
-This pattern repeats at every scale:
-- **Workflows** follow this pattern
-- **Actions** follow this pattern internally
-- **Scripts** follow this pattern
-
-Same pattern, different scales. **Fractal.**
-
----
-
-## Directory Structure
-
-```
-.
-├── .github/
-│   ├── workflows/              # Orchestration layer
-│   │   ├── _template.yml       # The canonical workflow pattern
-│   │   ├── ci.yml              # Continuous integration
-│   │   ├── test-suite.yml      # Test execution
-│   │   └── deploy.yml          # Deployment
-│   │
-│   └── actions/                # Composable building blocks
-│       ├── cadence/            # Behavior Layer (phase patterns)
-│       │   ├── phase-init/
-│       │   ├── phase-prepare/
-│       │   ├── phase-execute/
-│       │   ├── phase-report/
-│       │   └── phase-cleanup/
-│       │
-│       ├── survival/           # Reality Layer (entropy handling)
-│       │   ├── resource-check/
-│       │   ├── cleanup-disk/
-│       │   ├── prune-cache/
-│       │   ├── validate-health/
-│       │   └── graceful-fail/
-│       │
-│       └── observability/      # Teaching Layer (visibility)
-│           ├── metrics-collect/
-│           ├── summary-generate/
-│           ├── trace-context/
-│           └── failure-report/
-│
-├── docs/
-│   ├── architecture/           # Why it's designed this way
-│   │   ├── PHILOSOPHY.md       # The invariants we encode
-│   │   ├── PRINCIPLES.md       # The 10 laws
-│   │   ├── PATTERNS.md         # Recurring structures
-│   │   └── DECISION_LOG.md     # Design decisions
-│   │
-│   ├── operations/             # How to operate the system
-│   │   └── RUNBOOK.md          # Operational procedures
-│   │
-│   └── onboarding/             # How to learn the system
-│       ├── MENTAL_MODEL.md     # How to think about it
-│       └── CONTRIBUTING.md     # How to extend it
-│
-├── scripts/                    # Substrate-agnostic tooling
-│   ├── core/                   # Pure behavior (runs anywhere)
-│   │   ├── phase-runner.sh
-│   │   ├── metric-collector.sh
-│   │   └── health-check.sh
-│   │
-│   └── adapters/               # Context-specific wrappers
-│       ├── ci-adapter.sh       # For GitHub Actions
-│       ├── docker-adapter.sh   # For containers
-│       └── local-adapter.sh    # For local development
-│
-└── manifests/                  # Configuration as data
-    ├── phases.yml              # Phase definitions
-    ├── metrics.yml             # What to measure
-    ├── thresholds.yml          # When to care
-    └── cleanup-policies.yml    # Resource management
-```
-
----
-
-## The Three Layers
-
-### 1. Reality Layer (Survival)
-
-Handles the messy reality of execution:
-- Disk fills up
-- Memory exhausts
-- Networks fail
-- Caches corrupt
-
-**Actions:** `resource-check`, `cleanup-disk`, `prune-cache`, `validate-health`, `graceful-fail`
-
-### 2. Behavior Layer (Cadence)
-
-Defines patterns that remain invariant:
-- Init (establish context)
-- Prepare (ready resources)
-- Execute (do work)
-- Report (communicate state)
-- Cleanup (manage entropy)
-
-**Actions:** `phase-init`, `phase-prepare`, `phase-execute`, `phase-report`, `phase-cleanup`
-
-### 3. Teaching Layer (Observability)
-
-Makes the system comprehensible:
-- Collects metrics
-- Generates summaries
-- Establishes trace context
-- Reports failures informatively
-
-**Actions:** `metrics-collect`, `summary-generate`, `trace-context`, `failure-report`
-
----
-
-## Key Features
-
-### ✅ Substrate-Agnostic
-
-Core scripts work everywhere:
-- GitHub Actions
-- Docker containers
-- Local machines
-- CI runners
-- Any system with Bash
-
-### ✅ Observable
-
-Every action reports:
-- What it's doing
-- What it found
-- What it decided
-- Why it decided it
-
-Metrics flow to:
-- GitHub step summaries
-- JSON files (`.metrics/`)
-- Artifacts (retained 30-90 days)
-
-### ✅ Graceful Degradation
-
-When things fail:
-- Failures explain themselves
-- Context is preserved
-- Recovery is attempted
-- State is reported
-
-### ✅ Self-Teaching
-
-The system teaches through:
-- **Structure:** Consistent patterns make unfamiliar feel familiar
-- **Failure:** Errors explain what happened and why
-- **Metrics:** State is always visible
-
----
-
-## Example Workflow
-
-```yaml
-name: CI
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      # Phase 1: Init
-      - uses: ./.github/actions/cadence/phase-init
-        with:
-          context: ci
-      
-      # Phase 2: Prepare
-      - uses: ./.github/actions/cadence/phase-prepare
-        with:
-          language: python
-          cache-key: ${{ hashFiles('requirements.txt') }}
-      
-      # Phase 3: Execute
-      - uses: ./.github/actions/cadence/phase-execute
-        with:
-          command: pytest
-          collect-coverage: true
-      
-      # Phase 4: Report
-      - uses: ./.github/actions/cadence/phase-report
-        if: always()
-        with:
-          phase: execute
-          status: ${{ job.status }}
-      
-      # Phase 5: Cleanup
-      - uses: ./.github/actions/cadence/phase-cleanup
-        if: always()
-```
-
----
-
-## Philosophy
-
-We optimize for **sustained coherence**, not short-term speed.
-
-### The Four Invariants
-
-1. **Behavior is invariant** — Tools change, behavior doesn't
-2. **Structure teaches** — People learn by living in the system
-3. **Failure is information** — Systems fail informatively, not silently
-4. **Coherence under pressure** — Elegance during crisis, not just calm
-
-Read more: [docs/architecture/PHILOSOPHY.md](docs/architecture/PHILOSOPHY.md)
-
----
-
-## Common Tasks
-
-### Check System Health
 ```bash
-bash scripts/core/health-check.sh
+pytest -q
 ```
 
-### Collect Metrics
+Run the local research smoke test:
+
 ```bash
-bash scripts/core/metric-collector.sh --type resource
+python scripts/smoke_research.py
 ```
 
-### Run Workflow Locally
-```bash
-# Use adapters for local execution
-bash scripts/adapters/local-adapter.sh phase-runner --phase init --command "echo test"
+The GitHub Actions workflow `Dredge Echo Research Demo` exercises the live path:
+
+```text
+Tavily retrieval → Kimi synthesis → Nemotron verification → arbitration → grounded answer → trace
 ```
 
-### View Workflow Metrics
-```bash
-# After workflow completes
-gh run view <run-id>
-gh run download <run-id> --name metrics-*
-cat .metrics/*.json
-```
+Launch it from `.github/workflows/dredge-echo-research.yml`. Required credentials stay in GitHub Actions secrets; the workflow prints only non-secret execution evidence.
 
----
+## Project map
 
-## Documentation
+| Path | Purpose |
+|---|---|
+| `app.py` | Gradio research interface |
+| `bridge/search_adapter.py` | Tavily retrieval and evidence normalization |
+| `bridge/llm_adapter.py` | Nebius Token Factory / OpenAI-compatible model access |
+| `bridge/nemotron_verifier.py` | Nemotron claim assessment |
+| `bridge/research_agent.py` | Dredge Echo orchestration and arbitration |
+| `scripts/smoke_research.py` | End-to-end research smoke test |
+| `tests/test_research_agent.py` | Pipeline and failure-boundary tests |
+| `docs/TAVILY_RESEARCH.md` | Deeper architecture and configuration notes |
 
-### For Learning
-- [Mental Model](docs/onboarding/MENTAL_MODEL.md) - How to think about the system
-- [Contributing](docs/onboarding/CONTRIBUTING.md) - How to extend it
+## What changed during the hackathon
 
-### For Operating
-- [Runbook](docs/operations/RUNBOOK.md) - What to do when things break
+This repository began with a reusable **Fractal Operational Coherence** foundation: patterns for systems that preserve structure, observability, and graceful failure under pressure.
 
-### For Understanding
-- [Philosophy](docs/architecture/PHILOSOPHY.md) - Why it exists
-- [Principles](docs/architecture/PRINCIPLES.md) - The 10 laws
-- [Patterns](docs/architecture/PATTERNS.md) - Recurring structures
-- [Decisions](docs/architecture/DECISION_LOG.md) - Why we chose X over Y
+During the hackathon, that foundation became Dredge Echo through a substantial new product layer:
 
----
+- Nebius Token Factory model integration;
+- live Tavily retrieval and evidence normalization;
+- Kimi grounded synthesis;
+- NVIDIA Nemotron claim verification;
+- arbitration when the critic recommends correction;
+- a Gradio/Hugging Face demo surface;
+- evidence status, source display, and stage tracing;
+- unit tests, live smoke tests, and GitHub Actions verification.
 
-## What This Architecture Gives You
+The inherited coherence pattern is still present, but now it serves the agent: **Scout → Architect → Challenger → Arbiter** is the product cadence.
 
-### 1. Consistency
-Every workflow looks the same. Learn once, use everywhere.
+## Known limitations
 
-### 2. Observability
-Always know what's happening. Metrics, summaries, reports.
+- Source quality still depends on what retrieval can find and normalize.
+- Verification is evidence-bounded; it does not prove truth beyond the retrieved packet.
+- The current demo uses one critic pass rather than an open-ended debate.
+- Provider availability and rate limits can affect live latency.
+- The trace explains orchestration state and evidence status; it is not private model chain-of-thought.
 
-### 3. Resilience
-Handles failure gracefully. Informative errors. Recovery hints.
+## Vision
 
-### 4. Teachability
-New contributors productive in hours, not weeks.
+Dredge Echo is a step toward research agents that earn trust through structure.
 
-### 5. Substrate Freedom
-Same code works in GitHub Actions, Docker, local machines.
-
----
-
-## The Fractal Property
-
-```
-Repository (manifests → scripts → actions → workflows → docs)
-  ↓
-Workflow (init → prepare → execute → report → cleanup → seal)
-  ↓
-Action (inputs → validate → execute → report → outputs)
-  ↓
-Script (args → check → run → log → exit)
-```
-
-**Same rhythm at every level.**
-
----
-
-## Questions This Answers
-
-- ✅ "How do I make workflows consistent?" → **Use the cadence pattern**
-- ✅ "How do I handle failure gracefully?" → **Use survival actions**
-- ✅ "How do I make systems observable?" → **Use observability actions**
-- ✅ "How do I teach new people?" → **Structure teaches through use**
-- ✅ "How do I scale this?" → **Fractal patterns repeat everywhere**
-
----
+Not a black box that sounds certain.  
+A living instrument that retrieves, reasons, challenges, reconciles—and knows when silence is more honest than invention.
 
 ## License
 
-This architecture is a pattern, not code. Use it, adapt it, share it.
-
----
-
-## Further Reading
-
-Start here: [docs/onboarding/MENTAL_MODEL.md](docs/onboarding/MENTAL_MODEL.md)
-
-**This is not just a CI/CD setup.**  
-**This is an architecture for systems that hold their shape.**
+Released under the [MIT License](LICENSE).
