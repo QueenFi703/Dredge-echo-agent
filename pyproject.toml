@@ -31,8 +31,10 @@ research = ["tavily-python>=0.7,<1"]
 agent = [
     "openai>=1.0,<3",
     "tavily-python>=0.7,<1",
+    "arcadepy>=1.10,<2",
 ]
 demo = ["gradio>=5,<7"]
+arcade = ["arcadepy>=1.10,<2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["language", "compiler", "bridge"]

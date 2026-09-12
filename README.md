@@ -31,6 +31,23 @@ There is no silent provider fallback. Selecting Astra does not call Kimi, Nemotr
 
 In Astra mode, names such as `challenger`, `claim_mapper`, and `arbiter` are **Dredge execution roles**, not hidden external models. GPT-6 Astra performs the language-model work through separate role-specific calls while Dredge decides when those calls are needed and how deeply they should reason.
 
+## Interactive investigations powered by Arcade
+
+The demo is conversational. After the first answer, a judge can steer the same visible investigation with instructions such as:
+
+- `Challenge that assumption.`
+- `Focus on the Missouri evidence.`
+- `What would change the recommendation?`
+
+Each browser session receives a distinct runtime identity, and recent conversation context is carried into the next Dredge turn. The interface exposes two evidence channels:
+
+| Evidence channel | Behavior |
+|---|---|
+| **Tavily web evidence (default)** | Uses the original grounded web-retrieval adapter. |
+| **Arcade live news action** | Calls `GoogleNews.SearchNewsStories` through Arcade, normalizes the result into Dredge evidence, and records the Arcade tool and execution ID in the public trace. |
+
+Arcade is an action runtime, not another reasoning model. Astra or the selected Nebius models still reason; Arcade governs the external tool call. Tool execution is allowlisted, tied to the current session user, and handled outside model context. If a future tool needs OAuth, the UI returns Arcade's HTTPS authorization link and waits for the user to retry rather than exposing credentials or letting the model manufacture an approval URL.
+
 ## The idea in one line
 
 Most AI APIs look like this:
@@ -239,6 +256,9 @@ bridge/architecture.py
 bridge/astra_verifier.py
     Runs Astra's independent evidence-challenger call for Dredge.
 
+bridge/arcade_runtime.py
+    Authorizes and executes allowlisted Arcade tools and normalizes live news evidence.
+
 bridge/llm_adapter.py
     Provides the isolated OpenAI/Astra and Nebius model interfaces.
 
@@ -269,6 +289,10 @@ export OPENAI_MODEL="gpt-6-astra"
 export NEBIUS_API_KEY="your-nebius-key"
 export NEBIUS_MODEL="your-kimi-model"
 export NVIDIA_MODEL="your-nemotron-model"
+
+# Optional Arcade live-action evidence channel
+export ARCADE_API_KEY="your-arcade-project-key"
+export ARCADE_TOOL_ALLOWLIST="GoogleNews.SearchNewsStories"
 ```
 
 The selector invokes only the chosen route, so a deployment can run Astra alone or expose both architectures.
@@ -325,6 +349,9 @@ The Astra work remains on `feat/gpt-6-astra` unless an intentional release or me
 - ✅ Judge access flow with the published access code
 - ✅ Astra-default / Nebius-opt-in architecture selector
 - ✅ Provider-isolated runtime dispatch with no silent fallback
+- ✅ Multi-turn conversational investigation and steering
+- ✅ Arcade live-news tool execution with per-session identity
+- ✅ Arcade allowlist, authorization handoff, and execution telemetry
 
 ---
 

@@ -106,8 +106,17 @@ class ResearchAgent:
             raise RuntimeError("Dredge Echo arbitration returned an empty final answer")
 
         counts = verification_counts(verification)
+        retrieval_trace = {
+            "provider": evidence.get("provider") or "Tavily",
+            "source_count": len(evidence["sources"]),
+            "latency_ms": retrieval_ms,
+        }
+        if evidence.get("tool"):
+            retrieval_trace["tool"] = evidence["tool"]
+        if evidence.get("execution_id"):
+            retrieval_trace["execution_id"] = evidence["execution_id"]
         trace = {
-            "retrieval": {"provider": "Tavily", "source_count": len(evidence["sources"]), "latency_ms": retrieval_ms},
+            "retrieval": retrieval_trace,
             "synthesis": {"provider": "Kimi", "model": self.kimi_model, "status": "COMPLETE", "latency_ms": kimi_ms},
             "verification": {"provider": "NVIDIA Nemotron", "model": self.nemotron_model, "status": "COMPLETE", "latency_ms": nemotron_ms, "claims_evaluated": len(verification["claims"]), **counts},
             "arbitration": {"claims_revised": len(corrections), "evidence_confidence": _confidence(verification)},
