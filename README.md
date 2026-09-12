@@ -18,6 +18,19 @@ Dredge Echo Astra is an adaptive intelligence control plane built around GPT-6 A
 
 It does not just answer a question. It decides how much intelligence the question deserves, expands when the evidence becomes difficult, collapses when the answer becomes stable, and exposes those decisions as structured telemetry.
 
+## Two architectures, one Dredge control plane
+
+The Astra branch exposes two explicit intelligence routes. **Astra Adaptive is the default** and the primary Product Hunt experience. The original Nebius architecture remains available only when a user deliberately selects it.
+
+| Route | Runtime path | Best for |
+|---|---|---|
+| **Astra Adaptive (default)** | Tavily → Dredge control plane → GPT-6 Astra investigator → Astra evidence challenger → Dredge arbitration | Dynamic reasoning depth, topology changes, conflict expansion, and observable orchestration |
+| **Nebius Verified (optional)** | Tavily → Kimi synthesis → NVIDIA Nemotron verification → Dredge arbitration | Comparing the original independent multi-model verification pipeline |
+
+There is no silent provider fallback. Selecting Astra does not call Kimi, Nemotron, or Nebius. Selecting Nebius does not call Astra. Credentials are read only while building the route that the user chose.
+
+In Astra mode, names such as `challenger`, `claim_mapper`, and `arbiter` are **Dredge execution roles**, not hidden external models. GPT-6 Astra performs the language-model work through separate role-specific calls while Dredge decides when those calls are needed and how deeply they should reason.
+
 ## The idea in one line
 
 Most AI APIs look like this:
@@ -220,8 +233,17 @@ bridge/execution_graph.py
 bridge/adaptive_agent.py
     Runs the adaptive research loop and emits observable intelligence events.
 
+bridge/architecture.py
+    Defines the explicit Astra-default and Nebius-opt-in routing contract.
+
+bridge/astra_verifier.py
+    Runs Astra's independent evidence-challenger call for Dredge.
+
 bridge/llm_adapter.py
-    Provides the model interface used by the Astra path.
+    Provides the isolated OpenAI/Astra and Nebius model interfaces.
+
+app.py
+    Presents the architecture selector and dispatches only the chosen path.
 ```
 
 ## Run the branch
@@ -234,7 +256,22 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Set the required runtime secrets in your deployment environment. Do not commit API keys.
+Set the shared retrieval secret and the credentials for whichever routes the deployment should offer. Do not commit API keys.
+
+```bash
+export TAVILY_API_KEY="your-tavily-key"
+
+# Default Astra Adaptive route
+export OPENAI_API_KEY="your-openai-key"
+export OPENAI_MODEL="gpt-6-astra"
+
+# Optional Nebius Verified route
+export NEBIUS_API_KEY="your-nebius-key"
+export NEBIUS_MODEL="your-kimi-model"
+export NVIDIA_MODEL="your-nemotron-model"
+```
+
+The selector invokes only the chosen route, so a deployment can run Astra alone or expose both architectures.
 
 Then launch:
 
@@ -260,7 +297,7 @@ That is the product.
 
 ## Competition branch boundary
 
-This branch is intentionally isolated from the Nebius hackathon submission.
+This branch is intentionally isolated from the Nebius hackathon submission on `main`. It can demonstrate the original Nebius runtime as an optional comparison path without changing or redeploying that submission.
 
 ```text
 main
@@ -286,6 +323,8 @@ The Astra work remains on `feat/gpt-6-astra` unless an intentional release or me
 - ✅ Streaming topology transitions
 - ✅ Final Product Hunt presentation layer
 - ✅ Judge access flow with the published access code
+- ✅ Astra-default / Nebius-opt-in architecture selector
+- ✅ Provider-isolated runtime dispatch with no silent fallback
 
 ---
 
