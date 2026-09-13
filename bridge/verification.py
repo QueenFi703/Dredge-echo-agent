@@ -17,6 +17,10 @@ certainty. Use: SUPPORTED, PARTIAL, CONFLICTED, or UNSUPPORTED. Recommend only t
 smallest correction necessary. Agreement between models is not proof. Evidence
 outranks model consensus.
 
+Keep the response compact enough to complete reliably: evaluate at most 6 material
+claims, and keep each claim, reason, and recommended correction under 120 characters.
+Do not include markdown fences or any text outside the JSON object.
+
 Return JSON only:
 {"claims":[{"claim":"...","status":"SUPPORTED|PARTIAL|CONFLICTED|UNSUPPORTED",
 "evidence_ids":["source-1"],"reason":"...","recommended_correction":null}],

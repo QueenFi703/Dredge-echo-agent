@@ -32,7 +32,8 @@ jobs:
     timeout-minutes: 15
     env:
       TAVILY_PROJECT: ${{ vars.TAVILY_PROJECT || 'dredge-echo-agent' }}
-      NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
+      # Keep the low-cost architect separate from the legacy Kimi variable.
+      NEBIUS_MODEL: ${{ vars.ARCHITECT_MODEL || 'zai-org/GLM-5.3-Flash' }}
       ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL || 'moonshotai/Kimi-K3' }}
       NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}
       NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL || 'https://api.tokenfactory.nebius.com/v1' }}
@@ -87,5 +88,5 @@ jobs:
         run: |
           echo "Research question: $RESEARCH_QUESTION"
           echo "Run started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          python scripts/smoke_research.py "$RESEARCH_QUESTION"
+          python scripts/smoke_research.py "$RESEARCH_QUESTION" --max-results 3
           echo "Run finished: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
