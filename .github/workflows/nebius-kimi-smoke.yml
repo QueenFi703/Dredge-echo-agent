@@ -32,10 +32,10 @@ jobs:
         shell: bash
         env:
           NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
-          NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
+          ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL || 'moonshotai/Kimi-K3' }}
         run: |
           test -n "$NEBIUS_API_KEY" || { echo "NEBIUS_API_KEY secret is missing"; exit 1; }
-          test -n "$NEBIUS_MODEL" || { echo "NEBIUS_MODEL variable is missing"; exit 1; }
+          test -n "$ARBITRATION_MODEL" || { echo "ARBITRATION_MODEL variable is missing"; exit 1; }
 
       - name: Install Nebius client
         run: python -m pip install -e ".[nebius]"
@@ -43,6 +43,6 @@ jobs:
       - name: Call Kimi through Token Factory
         env:
           NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
-          NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
+          ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL || 'moonshotai/Kimi-K3' }}
           NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL || 'https://api.tokenfactory.nebius.com/v1' }}
         run: python scripts/smoke_nebius.py

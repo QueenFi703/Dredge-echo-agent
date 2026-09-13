@@ -14,4 +14,5 @@ class WorkflowSecurityTests(unittest.TestCase):
         workflow = Path(".github/workflows/dredge-echo-research.yml").read_text()
         self.assertIn("      - main", workflow)
         self.assertIn("NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}", workflow)
+        self.assertIn("ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL", workflow)
         self.assertIn("NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}", workflow)

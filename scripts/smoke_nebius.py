@@ -9,9 +9,9 @@ from bridge.llm_adapter import LLMAdapter
 
 
 def main() -> None:
-    model = os.environ["NEBIUS_MODEL"]
+    model = os.environ["ARBITRATION_MODEL"]
     started_at = datetime.now(timezone.utc).isoformat()
-    adapter = LLMAdapter(backend="nebius", model=model)
+    adapter = LLMAdapter(backend="nebius", model=model, max_tokens=80)
     response = adapter.generate(
         "health_check",
         source="dredge_echo_agent",

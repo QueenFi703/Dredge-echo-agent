@@ -33,6 +33,7 @@ jobs:
     env:
       TAVILY_PROJECT: ${{ vars.TAVILY_PROJECT || 'dredge-echo-agent' }}
       NEBIUS_MODEL: ${{ vars.NEBIUS_MODEL }}
+      ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL || 'moonshotai/Kimi-K3' }}
       NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}
       NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL || 'https://api.tokenfactory.nebius.com/v1' }}
       RESEARCH_QUESTION: ${{ inputs.question || 'What are the latest practical developments in agentic AI infrastructure?' }}
@@ -57,10 +58,12 @@ jobs:
           test -n "$TAVILY_PROJECT" || { echo "TAVILY_PROJECT variable is missing"; exit 1; }
           test -n "$NEBIUS_API_KEY" || { echo "NEBIUS_API_KEY secret is missing"; exit 1; }
           test -n "$NEBIUS_MODEL" || { echo "NEBIUS_MODEL variable is missing"; exit 1; }
+          test -n "$ARBITRATION_MODEL" || { echo "ARBITRATION_MODEL variable is missing"; exit 1; }
           test -n "$NVIDIA_MODEL" || { echo "NVIDIA_MODEL variable is missing"; exit 1; }
           test -n "$NEBIUS_BASE_URL" || { echo "NEBIUS_BASE_URL variable is missing"; exit 1; }
           echo "Live research configuration is present."
-          echo "Kimi model: $NEBIUS_MODEL"
+          echo "Architect model: $NEBIUS_MODEL"
+          echo "Kimi escalation model: $ARBITRATION_MODEL"
           echo "Nemotron model: $NVIDIA_MODEL"
           echo "Tavily project: $TAVILY_PROJECT"
           python - <<'PY'

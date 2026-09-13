@@ -25,16 +25,20 @@ if spaces is not None:
 
 
 def build_agent() -> ResearchAgent:
-    kimi_model = os.environ["NEBIUS_MODEL"]
+    architect_model = os.environ["NEBIUS_MODEL"]
+    arbitration_model = os.environ.get("ARBITRATION_MODEL", "moonshotai/Kimi-K3")
     nemotron_model = os.environ["NVIDIA_MODEL"]
-    kimi = LLMAdapter(backend="nebius", model=kimi_model)
-    nemotron = LLMAdapter(backend="nebius", model=nemotron_model)
+    architect = LLMAdapter(backend="nebius", model=architect_model, max_tokens=800)
+    nemotron = LLMAdapter(backend="nebius", model=nemotron_model, max_tokens=900)
+    kimi = LLMAdapter(backend="nebius", model=arbitration_model, max_tokens=800)
     return ResearchAgent(
         search=TavilySearchAdapter(),
-        llm=kimi,
+        llm=architect,
         verifier=NemotronVerifier(nemotron),
+        repairer=architect,
         arbitrator=kimi,
-        kimi_model=kimi_model,
+        architect_model=architect_model,
+        arbitrator_model=arbitration_model,
         nemotron_model=nemotron_model,
     )
 
@@ -70,8 +74,8 @@ def run_research(question: str):
 with gr.Blocks(title="Dredge Echo") as demo:
     gr.Markdown(
         "# Dredge Echo\n"
-        "Current, verifiable research through Tavily retrieval, Kimi synthesis, "
-        "and NVIDIA Nemotron citation checking."
+        "Current, verifiable research through Tavily retrieval, a fast GLM Architect, "
+        "NVIDIA Nemotron citation checking, and Kimi escalation for disputed claims."
     )
     question = gr.Textbox(
         label="Research question",

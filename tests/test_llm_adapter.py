@@ -68,6 +68,15 @@ class NebiusBackendTests(unittest.TestCase):
 
         self.assertEqual(_FakeOpenAI.clients[0].calls[0]["model"], "explicit-model")
 
+    def test_nebius_applies_output_token_cap(self):
+        fake_module = types.SimpleNamespace(OpenAI=_FakeOpenAI)
+        env = {"NEBIUS_API_KEY": "test-key"}
+        with patch.dict(os.environ, env, clear=True), patch.dict(
+            sys.modules, {"openai": fake_module}
+        ):
+            LLMAdapter(backend="nebius", model="test-model", max_tokens=800).generate("infer")
+        self.assertEqual(_FakeOpenAI.clients[0].calls[0]["max_tokens"], 800)
+
     def test_nebius_requires_api_key(self):
         with patch.dict(os.environ, {"NEBIUS_MODEL": "test-model"}, clear=True):
             with self.assertRaisesRegex(LLMBackendError, "NEBIUS_API_KEY"):

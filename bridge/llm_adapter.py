@@ -63,9 +63,13 @@ class LLMAdapter:
         backend: str = "dry_run",
         model: Optional[str] = None,
         prompt_template: Optional[str] = None,
+        max_tokens: Optional[int] = None,
     ) -> None:
+        if max_tokens is not None and max_tokens < 1:
+            raise ValueError("max_tokens must be positive")
         self._backend = backend
         self._model = model
+        self._max_tokens = max_tokens
         self._template = prompt_template or self.DEFAULT_TEMPLATE
         self._call_fn: Callable = self._resolve_backend(backend)
 
@@ -133,9 +137,14 @@ class LLMAdapter:
         try:
             import openai  # type: ignore
             client = openai.OpenAI()
+            request = {
+                "model": self._model or "gpt-4o",
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if self._max_tokens is not None:
+                request["max_tokens"] = self._max_tokens
             response = client.chat.completions.create(
-                model=self._model or "gpt-4o",
-                messages=[{"role": "user", "content": prompt}],
+                **request,
             )
             return response.choices[0].message.content or ""
         except ImportError:
@@ -170,10 +179,13 @@ class LLMAdapter:
             ) from exc
 
         client = openai.OpenAI(api_key=api_key, base_url=base_url)
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        request = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if self._max_tokens is not None:
+            request["max_tokens"] = self._max_tokens
+        response = client.chat.completions.create(**request)
         return response.choices[0].message.content or ""
 
     @staticmethod

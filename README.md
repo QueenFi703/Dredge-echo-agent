@@ -25,11 +25,11 @@ Question
   ↓
 Tavily — Scout
   ↓
-Kimi on Nebius Token Factory — Architect
+GLM-5.3-Flash on Nebius Token Factory — Architect
   ↓
 NVIDIA Nemotron — Challenger
   ↓
-Dredge Echo — Arbiter
+Dredge Echo — Router + Arbiter (Kimi on serious disputes)
   ↓
 Grounded answer + sources + evidence status + trace
 ```
@@ -39,11 +39,12 @@ Each model has one job:
 | Layer | Role | Responsibility |
 |---|---|---|
 | **Tavily** | Scout | Retrieves current, relevant web evidence at runtime. |
-| **Kimi** | Architect | Produces the first grounded synthesis from the retrieved evidence. |
+| **GLM-5.3-Flash** | Architect | Produces the fast, low-cost grounded synthesis from the retrieved evidence. |
 | **NVIDIA Nemotron** | Challenger | Checks material claims for support, contradiction, missing context, and excess certainty. |
-| **Dredge Echo** | Arbiter | Reconciles the critique with the evidence and returns the final answer. |
+| **Dredge Echo** | Router | Skips arbitration for supported answers, sends partial claims back to GLM, and escalates serious disputes. |
+| **Kimi K3** | Escalation Arbiter | Reconciles only conflicted or unsupported claims against the source packet. |
 
-Nemotron is intentionally not used as a second answer generator. Its independent role is to pressure-test Kimi's draft. When it recommends corrections, Dredge Echo invokes Kimi again to arbitrate the disputed claims against the source packet.
+Nemotron is intentionally not used as a second answer generator. Its independent role is to pressure-test the Architect's draft. Supported answers stop immediately, partial claims get an economical GLM repair, and only conflicted or unsupported claims trigger the more expensive Kimi arbitration path.
 
 ## Why Dredge Echo exists
 
@@ -73,7 +74,7 @@ That is the echo: the answer returns with the shape of its evidence still audibl
 
 Dredge Echo uses **Nebius Token Factory** as the inference gateway and **NVIDIA Nemotron 3 Nano 30B A3B** as its evidence critic.
 
-The Nano variant fits the critic role: verification calls should be fast and economical enough to run after every synthesis, while still being capable of structured claim-level review. Kimi remains the primary synthesizer; Nemotron adds an independent adversarial pass.
+The Nano variant fits the critic role: verification calls should be fast and economical enough to run after every synthesis, while still being capable of structured claim-level review. GLM-5.3-Flash handles routine synthesis, Nemotron adds an independent adversarial pass, and Kimi is reserved for the cases where its higher-cost reasoning adds the most value.
 
 Tavily is a functional runtime component, not a decorative integration. Every live research request begins with a Tavily retrieval call whose normalized evidence is passed downstream to both synthesis and verification.
 
@@ -107,7 +108,8 @@ Set the model and endpoint configuration:
 ```bash
 export TAVILY_PROJECT="dredge-echo-agent"
 export NEBIUS_BASE_URL="https://api.tokenfactory.nebius.com/v1"
-export NEBIUS_MODEL="moonshotai/Kimi-K3"
+export NEBIUS_MODEL="zai-org/GLM-5.3-Flash"
+export ARBITRATION_MODEL="moonshotai/Kimi-K3"
 export NVIDIA_MODEL="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
 ```
 
@@ -134,13 +136,15 @@ from bridge.llm_adapter import LLMAdapter
 from bridge.verification import NemotronVerifier
 
 search = TavilySearchAdapter()
-kimi = LLMAdapter(backend="nebius")
+architect = LLMAdapter(backend="nebius", model="zai-org/GLM-5.3-Flash", max_tokens=800)
 critic = LLMAdapter(backend="nebius", model="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B")
+kimi = LLMAdapter(backend="nebius", model="moonshotai/Kimi-K3", max_tokens=800)
 
 agent = ResearchAgent(
     search=search,
-    llm=kimi,
+    llm=architect,
     verifier=NemotronVerifier(critic),
+    repairer=architect,
     arbitrator=kimi,
 )
 
@@ -177,7 +181,7 @@ python scripts/smoke_research.py
 The GitHub Actions workflow `Dredge Echo Research Demo` exercises the live path:
 
 ```text
-Tavily retrieval → Kimi synthesis → Nemotron verification → arbitration → grounded answer → trace
+Tavily retrieval → GLM synthesis → Nemotron verification → dynamic repair or Kimi escalation → grounded answer → trace
 ```
 
 Launch it from `.github/workflows/dredge-echo-research.yml`. Required credentials stay in GitHub Actions secrets; the workflow prints only non-secret execution evidence.
@@ -203,9 +207,9 @@ During the hackathon, that foundation became Dredge Echo through a substantial n
 
 - Nebius Token Factory model integration;
 - live Tavily retrieval and evidence normalization;
-- Kimi grounded synthesis;
+- low-cost GLM grounded synthesis;
 - NVIDIA Nemotron claim verification;
-- arbitration when the critic recommends correction;
+- dynamic GLM repair or Kimi escalation when the critic recommends correction;
 - a Gradio/Hugging Face demo surface;
 - evidence status, source display, and stage tracing;
 - unit tests, live smoke tests, and GitHub Actions verification.
