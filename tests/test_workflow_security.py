@@ -17,3 +17,8 @@ class WorkflowSecurityTests(unittest.TestCase):
         self.assertIn("ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL", workflow)
         self.assertIn("NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}", workflow)
         self.assertIn('--max-results 3', workflow)
+
+    def test_kimi_smoke_is_manual_only(self):
+        workflow = Path(".github/workflows/nebius-kimi-smoke.yml").read_text()
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertNotIn("  push:", workflow)

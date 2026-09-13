@@ -11,7 +11,9 @@ from bridge.llm_adapter import LLMAdapter
 def main() -> None:
     model = os.environ["ARBITRATION_MODEL"]
     started_at = datetime.now(timezone.utc).isoformat()
-    adapter = LLMAdapter(backend="nebius", model=model, max_tokens=80)
+    # Kimi is a reasoning model; a tiny cap can be consumed before visible output.
+    # This manual-only smoke test therefore allows a complete short response.
+    adapter = LLMAdapter(backend="nebius", model=model, max_tokens=2048)
     response = adapter.generate(
         "health_check",
         source="dredge_echo_agent",
