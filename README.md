@@ -137,8 +137,8 @@ from bridge.verification import NemotronVerifier
 
 search = TavilySearchAdapter()
 architect = LLMAdapter(backend="nebius", model="zai-org/GLM-5.3-Flash", max_tokens=2048)
-critic = LLMAdapter(backend="nebius", model="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B")
-kimi = LLMAdapter(backend="nebius", model="moonshotai/Kimi-K3", max_tokens=800)
+critic = LLMAdapter(backend="nebius", model="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B", max_tokens=2048)
+kimi = LLMAdapter(backend="nebius", model="moonshotai/Kimi-K3", max_tokens=2048)
 
 agent = ResearchAgent(
     search=search,

@@ -29,8 +29,8 @@ def build_agent() -> ResearchAgent:
     arbitration_model = os.environ.get("ARBITRATION_MODEL", "moonshotai/Kimi-K3")
     nemotron_model = os.environ["NVIDIA_MODEL"]
     architect = LLMAdapter(backend="nebius", model=architect_model, max_tokens=2048)
-    nemotron = LLMAdapter(backend="nebius", model=nemotron_model, max_tokens=900)
-    kimi = LLMAdapter(backend="nebius", model=arbitration_model, max_tokens=800)
+    nemotron = LLMAdapter(backend="nebius", model=nemotron_model, max_tokens=2048)
+    kimi = LLMAdapter(backend="nebius", model=arbitration_model, max_tokens=2048)
     return ResearchAgent(
         search=TavilySearchAdapter(),
         llm=architect,
