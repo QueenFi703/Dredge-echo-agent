@@ -29,9 +29,9 @@ def main() -> None:
 
     agent = ResearchAgent(
         search=TavilySearchAdapter(),
-        llm=LLMAdapter(backend="nebius", model=architect_model, max_tokens=800),
+        llm=LLMAdapter(backend="nebius", model=architect_model, max_tokens=2048),
         verifier=NemotronVerifier(LLMAdapter(backend="nebius", model=nvidia_model, max_tokens=900)),
-        repairer=LLMAdapter(backend="nebius", model=architect_model, max_tokens=800),
+        repairer=LLMAdapter(backend="nebius", model=architect_model, max_tokens=2048),
         arbitrator=LLMAdapter(backend="nebius", model=arbitration_model, max_tokens=800),
         architect_model=architect_model,
         arbitrator_model=arbitration_model,
