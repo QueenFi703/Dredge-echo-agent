@@ -220,7 +220,7 @@ The inherited coherence pattern is still present, but now it serves the agent: *
 
 - Source quality still depends on what retrieval can find and normalize.
 - Verification is evidence-bounded; it does not prove truth beyond the retrieved packet.
-- The current demo uses one critic pass rather than an open-ended debate.
+- Unchanged answers reuse their initial critic assessment. Repaired or escalated answers receive a second Nemotron check; unresolved evidence limitations remain visible. This is bounded verification, not an open-ended debate.
 - Provider availability and rate limits can affect live latency.
 - The trace explains orchestration state and evidence status; it is not private model chain-of-thought.
 
@@ -234,3 +234,22 @@ A living instrument that retrieves, reasons, challenges, reconciles—and knows 
 ## License
 
 Released under the [MIT License](LICENSE).
+
+## Final-answer verification and routing benchmark
+
+The returned verification and confidence describe the final answer. The original
+assessment is retained as `draft_verification`, and the trace records a separate
+`final_verification` stage. A malformed final assessment fails the request rather
+than returning an unchecked revision.
+
+Run `python scripts/benchmark_routing.py routing-benchmark.json` with the documented
+provider environment configured, or use the **Echo paired routing benchmark**
+Actions workflow. It compares three paired questions using identical retrieved
+evidence, GLM draft, and initial Nemotron assessment within each pair. The baseline
+always runs Kimi and then checks its answer. Both routes include final-answer
+verification. Execution order alternates across pairs.
+
+The artifact reports measured latency, provider-reported token usage by model,
+model-call counts, and final evidence statuses. This small sample does not establish
+general accuracy, average production latency, or dollar savings. Tokens across
+different models are not interchangeable costs.

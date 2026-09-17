@@ -36,10 +36,13 @@ def present_result(result: ResearchResult) -> DemoOutput:
         "missing_evidence": result.verification.get("missing_evidence", []),
     }
     status = result.trace.get("arbitration", {}).get("evidence_confidence", "UNKNOWN")
+    evidence_status = f"Evidence confidence: **{status}**"
+    if result.trace.get("final_verification") and status != "HIGH":
+        evidence_status += " — The final answer has unresolved evidence limitations; inspect the claim assessment."
     return DemoOutput(
         answer=result.answer,
         sources_markdown="\n".join(source_lines) or "Insufficient evidence: no usable source URLs were returned.",
-        evidence_status=f"Evidence confidence: **{status}**",
+        evidence_status=evidence_status,
         verification_json=json.dumps(public_verification, indent=2),
         trace_json=json.dumps(result.trace, indent=2),
     )
