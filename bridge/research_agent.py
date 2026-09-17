@@ -19,6 +19,7 @@ class ResearchResult:
     draft: str
     verification: Dict[str, Any]
     trace: Dict[str, Any]
+    draft_verification: Optional[Dict[str, Any]] = None
 
 
 class ResearchAgent:
@@ -120,22 +121,41 @@ class ResearchAgent:
         if not answer.strip():
             raise RuntimeError("Dredge Echo arbitration returned an empty final answer")
 
-        counts = verification_counts(verification)
+        # A repaired answer is a new candidate and needs its own evidence check.
+        draft_verification = verification
+        final_verification_ms = 0
+        final_check_status = "REUSED_DRAFT_CHECK"
+        if arbitration_route != "SKIPPED":
+            started = perf_counter()
+            verification = self.verifier.verify(
+                question=question, evidence=evidence, proposed_answer=answer
+            )
+            final_verification_ms = round((perf_counter() - started) * 1000)
+            final_check_status = "COMPLETE"
+
+        counts = verification_counts(draft_verification)
+        final_counts = verification_counts(verification)
         trace = {
             "retrieval": {"provider": "Tavily", "source_count": len(evidence["sources"]), "latency_ms": retrieval_ms},
             "synthesis": {"provider": "Z.ai", "role": "Architect", "model": self.architect_model, "status": "COMPLETE", "latency_ms": architect_ms},
-            "verification": {"provider": "NVIDIA Nemotron", "model": self.nemotron_model, "status": "COMPLETE", "latency_ms": nemotron_ms, "claims_evaluated": len(verification["claims"]), **counts},
+            "verification": {"provider": "NVIDIA Nemotron", "model": self.nemotron_model, "status": "COMPLETE", "latency_ms": nemotron_ms, "claims_evaluated": len(draft_verification["claims"]), **counts},
             "arbitration": {"route": arbitration_route, "provider": "Moonshot AI Kimi" if arbitration_route == "KIMI_ESCALATION" else "Z.ai" if arbitration_route == "ARCHITECT_REPAIR" else None, "model": self.arbitrator_model if arbitration_route == "KIMI_ESCALATION" else self.architect_model if arbitration_route == "ARCHITECT_REPAIR" else None, "claims_revised": len(corrections), "evidence_confidence": _confidence(verification), "latency_ms": arbitration_ms},
+            "final_verification": {
+                "provider": "NVIDIA Nemotron", "model": self.nemotron_model,
+                "status": final_check_status, "latency_ms": final_verification_ms,
+                "claims_evaluated": len(verification["claims"]),
+                "evidence_confidence": _confidence(verification), **final_counts,
+            },
             "total_latency_ms": round((perf_counter() - cycle_started) * 1000),
         }
-        return ResearchResult(question, evidence, answer, draft, verification, trace)
+        return ResearchResult(question, evidence, answer, draft, verification, trace, draft_verification)
 
 
 def _confidence(verification: Dict[str, Any]) -> str:
     counts = verification_counts(verification)
     total = len(verification["claims"])
-    if counts["unsupported"] or counts["conflicted"]:
+    if counts["unsupported"] or counts["conflicted"] or verification.get("overall_status") in {"UNSUPPORTED", "CONFLICTED"}:
         return "LOW"
-    if counts["partial"]:
+    if counts["partial"] or verification.get("overall_status") == "PARTIAL":
         return "MEDIUM"
     return "HIGH" if total else "LOW"
