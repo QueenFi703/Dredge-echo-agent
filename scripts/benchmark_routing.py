@@ -32,8 +32,16 @@ class MeteredLLM(LLMAdapter):
                         base_url=os.environ.get("NEBIUS_BASE_URL", "https://api.tokenfactory.nebius.com/v1"),
                         timeout=120, max_retries=0)
         started = perf_counter()
-        response = client.chat.completions.create(
-            model=self._model, messages=[{"role": "user", "content": prompt}], max_tokens=2048)
+        print(json.dumps({"event": "model_start", "model": self._model}), flush=True)
+        try:
+            response = client.chat.completions.create(
+                model=self._model, messages=[{"role": "user", "content": prompt}], max_tokens=2048)
+        except Exception as exc:
+            print(json.dumps({"event": "model_error", "model": self._model,
+                              "error_type": type(exc).__name__,
+                              "cause_type": type(exc.__cause__).__name__,
+                              "latency_ms": round((perf_counter()-started)*1000)}), flush=True)
+            raise
         usage = response.usage
         self.calls.append({
             "model": self._model, "latency_ms": round((perf_counter()-started)*1000),
@@ -87,13 +95,16 @@ def main():
             report["cases"].append(case)
             try:
                 started = perf_counter()
+                case["stage"] = "retrieval"
                 evidence = TavilySearchAdapter().search(question, max_results=3)
                 if not evidence.get("sources"): raise RuntimeError("No evidence")
+                case["stage"] = "synthesis"
                 draft = architect.generate("research_and_reason", source="tavily_web_evidence",
                     target="grounded_answer", source_value={"question": question,
                     "instructions": "Answer using the supplied evidence. Distinguish evidence from inference, do not invent sources, and include source URLs for material claims.",
                     "evidence": evidence})
                 if not draft.strip(): raise RuntimeError("Empty draft")
+                case["stage"] = "initial_verification"
                 initial = verifier.verify(question=question, evidence=evidence, proposed_answer=draft)
                 shared_ms = round((perf_counter()-started)*1000)
                 # Capture shared calls by each model's current list; no previous-case records.
@@ -102,6 +113,7 @@ def main():
                                   "initial_counts": verification_counts(initial)}
                 case["source_urls"] = [s["url"] for s in evidence["sources"]]
                 for mode in (["dynamic", "always_kimi"] if index % 2 == 0 else ["always_kimi", "dynamic"]):
+                    case["stage"] = mode
                     offsets = [len(m.calls) for m in (architect, critic, kimi)]
                     started = perf_counter()
                     if mode == "dynamic":
@@ -128,12 +140,15 @@ def main():
                         "calls": shared+post_calls, **totals(shared+post_calls),
                         "final_overall_status": final["overall_status"],
                         "final_counts": verification_counts(final)}
+                case["stage"] = "complete"
                 case["latency_saved_ms"] = case["always_kimi"]["total_latency_ms"] - case["dynamic"]["total_latency_ms"]
                 print(json.dumps(case), flush=True)
             except Exception as exc:
                 # Avoid exposing provider exception messages or credentials in public artifacts.
                 case["error_type"] = type(exc).__name__
-                print(json.dumps({"question": question, "error_type": type(exc).__name__}), flush=True)
+                print(json.dumps({"question": question, "stage": case["stage"], "error_type": type(exc).__name__}), flush=True)
+                if "shared" not in case:
+                    break  # Do not repeat a failed shared-stage provider call across every question.
     finally:
         report["completed_at"] = datetime.now(timezone.utc).isoformat()
         report["complete_pairs"] = sum("dynamic" in c and "always_kimi" in c for c in report["cases"])
