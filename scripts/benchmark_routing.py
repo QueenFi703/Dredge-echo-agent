@@ -23,10 +23,15 @@ QUESTIONS = [
 ]
 
 def completion_budgets(model):
-    """Keep routine calls compact while giving GLM-5.3 room to finish reasoning."""
-    if model == "zai-org/GLM-5.3":
+    """Bound reasoning models without cutting off their final answers."""
+    if model in {"zai-org/GLM-5.3", "moonshotai/Kimi-K3"}:
         return (4096, 8192)
+    if model.startswith("nvidia/NVIDIA-Nemotron-3-Nano"):
+        return (2048, 4096)
     return (512, 2048)
+
+def completion_is_usable(content, finish_reason):
+    return bool(content.strip()) and finish_reason != "length"
 
 class MeteredLLM(LLMAdapter):
     def __init__(self, model):
@@ -39,9 +44,9 @@ class MeteredLLM(LLMAdapter):
         client = OpenAI(api_key=os.environ["NEBIUS_API_KEY"],
                         base_url=os.environ.get("NEBIUS_BASE_URL", "https://api.tokenfactory.nebius.com/v1"),
                         timeout=60, max_retries=0)
-        # Some reasoning models can spend a compact completion budget entirely
-        # on reasoning and return no answer text. Allow one bounded recovery
-        # attempt with a larger budget; transport failures are not retried.
+        # Reasoning models can consume a compact budget before returning a final
+        # answer. Retry once for empty or length-truncated completions only;
+        # transport failures are not retried.
         for attempt, max_tokens in enumerate(completion_budgets(self._model), start=1):
             started = perf_counter()
             print(json.dumps({"event": "model_start", "model": self._model,
@@ -58,14 +63,16 @@ class MeteredLLM(LLMAdapter):
                 raise
             usage = response.usage
             content = response.choices[0].message.content or ""
+            finish_reason = response.choices[0].finish_reason
             self.calls.append({
                 "model": self._model, "attempt": attempt,
                 "latency_ms": round((perf_counter()-started)*1000),
                 "input_tokens": usage.prompt_tokens if usage else None,
                 "output_tokens": usage.completion_tokens if usage else None,
                 "empty_completion": not bool(content.strip()),
+                "finish_reason": finish_reason,
             })
-            if content.strip():
+            if completion_is_usable(content, finish_reason):
                 return content
         return ""
 
@@ -101,7 +108,7 @@ def main():
     report = {
         "started_at": datetime.now(timezone.utc).isoformat(),
         "commit": os.environ.get("GITHUB_SHA"),
-        "method": "Three paired questions; same live Tavily packet, GLM draft and initial Nemotron check per pair; baseline always runs Kimi then final Nemotron; alternating route execution order; transport failures are not retried; one bounded recovery attempt is allowed only for an empty completion; small sample, not a general performance guarantee.",
+        "method": "Three paired questions; same live Tavily packet, GLM draft and initial Nemotron check per pair; baseline always runs Kimi then final Nemotron; alternating route execution order; transport failures are not retried; one bounded recovery attempt is allowed for an empty or length-truncated completion; small sample, not a general performance guarantee.",
         "comparison_status": "INCOMPLETE",
         "cases": [],
     }
