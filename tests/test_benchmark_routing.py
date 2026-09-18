@@ -34,6 +34,15 @@ class TimeoutModel(FakeModel):
             raise TimeoutError("provider timed out")
         return super().generate(action, **kwargs)
 
+class EmptyModel(FakeModel):
+    def generate(self, action, **kwargs):
+        if action == "research_and_reason":
+            self.calls.append({"model": self._model, "latency_ms": 1,
+                               "input_tokens": 12, "output_tokens": 7,
+                               "empty_completion": True})
+            return ""
+        return super().generate(action, **kwargs)
+
 class BenchmarkTests(unittest.TestCase):
     def test_paired_report_counts_each_route_and_shared_prefix_once(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -60,6 +69,19 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(report["complete_pairs"], 0)
         self.assertEqual(report["cases"][0]["stage"], "synthesis")
         self.assertEqual(report["cases"][0]["error_type"], "TimeoutError")
+        self.assertEqual(report["attempted_usage"]["model_calls"], 0)
+
+    def test_empty_completion_preserves_billable_usage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)/"report.json"
+            with patch.object(benchmark, "MeteredLLM", EmptyModel), patch.object(benchmark, "TavilySearchAdapter", FakeSearch), patch.object(benchmark, "QUESTIONS", ["Q0"]), patch.object(benchmark.sys, "argv", ["benchmark", str(output)]), patch.dict(os.environ, {"NEBIUS_MODEL": "glm", "NVIDIA_MODEL": "critic", "ARBITRATION_MODEL": "kimi"}), contextlib.redirect_stdout(io.StringIO()):
+                benchmark.main()
+            report = json.loads(output.read_text())
+        self.assertEqual(report["comparison_status"], "INCOMPLETE")
+        self.assertEqual(report["attempted_usage"], {
+            "model_calls": 1, "input_tokens": 12, "output_tokens": 7
+        })
+        self.assertTrue(report["cases"][0]["attempted_calls"][0]["empty_completion"])
 
 if __name__ == "__main__":
     unittest.main()
