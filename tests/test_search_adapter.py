@@ -21,6 +21,7 @@ class _FakeTavilyClient:
             "query": kwargs["query"],
             "answer": "summary",
             "response_time": 0.25,
+            "usage": {"credits": 1},
             "results": [
                 {
                     "title": "Example",
@@ -51,6 +52,8 @@ class TavilySearchAdapterTests(unittest.TestCase):
         self.assertEqual(client.options["project_id"], "dredge-echo-agent")
         self.assertEqual(client.calls[0]["max_results"], 3)
         self.assertTrue(client.calls[0]["include_answer"])
+        self.assertTrue(client.calls[0]["include_usage"])
+        self.assertEqual(result["usage"]["credits"], 1)
         self.assertEqual(result["sources"][0]["url"], "https://example.com")
         self.assertNotIn("raw_content", result["sources"][0])
 

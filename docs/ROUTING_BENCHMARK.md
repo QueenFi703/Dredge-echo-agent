@@ -43,3 +43,12 @@ The retry completed retrieval, then GLM synthesis hit a ReadTimeout after
 120,715 ms. It stopped at that shared stage with zero complete pairs. Neither
 run reached a live final-answer verification assessment. Local regression checks
 and the CI unit/integration jobs pass; live final verification remains unverified.
+
+## Workflow interpretation
+
+Routing correctness and live-provider availability are now reported separately.
+The deterministic routing suite is a required CI gate. The live workflow caps each
+model response at 512 tokens, disables retries, and applies a 60-second request
+timeout. It always writes `comparison_status: COMPLETE|INCOMPLETE` when the process
+can produce an artifact. An incomplete provider run remains visible in the job
+summary and artifact but no longer mislabels tested routing code as broken.

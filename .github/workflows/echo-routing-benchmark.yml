@@ -1,19 +1,36 @@
 name: Echo paired routing benchmark
 on:
-  push:
-    branches: [codex/echo-final-verification-routing]
+  pull_request:
+    branches: [main]
     paths:
       - "scripts/benchmark_routing.py"
+      - "tests/test_benchmark_routing.py"
+      - ".github/workflows/echo-routing-benchmark.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/benchmark_routing.py"
+      - "tests/test_benchmark_routing.py"
       - ".github/workflows/echo-routing-benchmark.yml"
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
+  deterministic-routing-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[agent]"
+      - run: python -m unittest tests.test_benchmark_routing -q
   benchmark:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      NEBIUS_MODEL: ${{ vars.ARCHITECT_MODEL || 'zai-org/GLM-5.3-Flash' }}
+      NEBIUS_MODEL: ${{ vars.ARCHITECT_MODEL || 'zai-org/GLM-5.3' }}
       ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL || 'moonshotai/Kimi-K3' }}
       NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}
       NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL || 'https://api.tokenfactory.nebius.com/v1' }}
@@ -30,6 +47,26 @@ jobs:
           NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: python scripts/benchmark_routing.py routing-benchmark.json
+      - name: Publish benchmark status
+        if: always()
+        shell: bash
+        run: |
+          if test -f routing-benchmark.json; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("routing-benchmark.json").read_text())
+          print("## Echo paired routing benchmark")
+          print()
+          print(f"- Status: **{report['comparison_status']}**")
+          print(f"- Complete pairs: **{report['complete_pairs']} / {report['requested_pairs']}**")
+          if report["comparison_status"] != "COMPLETE":
+              print("- No live speed, token, cost, or accuracy advantage is established by this run.")
+          PY
+          else
+            echo "Benchmark ended before an artifact was written." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
