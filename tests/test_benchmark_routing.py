@@ -46,7 +46,14 @@ class EmptyModel(FakeModel):
 class BenchmarkTests(unittest.TestCase):
     def test_glm_reasoning_budget_is_larger_but_bounded(self):
         self.assertEqual(benchmark.completion_budgets("zai-org/GLM-5.3"), (4096, 8192))
-        self.assertEqual(benchmark.completion_budgets("moonshotai/Kimi-K3"), (512, 2048))
+        self.assertEqual(benchmark.completion_budgets("moonshotai/Kimi-K3"), (4096, 8192))
+        self.assertEqual(benchmark.completion_budgets(
+            "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"), (2048, 4096))
+
+    def test_length_truncated_completion_is_not_accepted(self):
+        self.assertFalse(benchmark.completion_is_usable("partial answer", "length"))
+        self.assertFalse(benchmark.completion_is_usable("", "stop"))
+        self.assertTrue(benchmark.completion_is_usable("complete answer", "stop"))
 
     def test_paired_report_counts_each_route_and_shared_prefix_once(self):
         with tempfile.TemporaryDirectory() as directory:
