@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      NEBIUS_MODEL: ${{ vars.ARCHITECT_MODEL || 'zai-org/GLM-5.3-Flash' }}
+      NEBIUS_MODEL: ${{ vars.ARCHITECT_MODEL || 'zai-org/GLM-5.3' }}
       ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL || 'moonshotai/Kimi-K3' }}
       NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}
       NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL || 'https://api.tokenfactory.nebius.com/v1' }}
