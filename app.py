@@ -12,18 +12,6 @@ from bridge.research_agent import ResearchAgent
 from bridge.search_adapter import TavilySearchAdapter
 from bridge.verification import NemotronVerifier
 
-try:
-    import spaces
-except ImportError:  # Local and non-Space deployments do not need ZeroGPU.
-    spaces = None
-
-
-if spaces is not None:
-    @spaces.GPU(duration=1)
-    def _zero_gpu_capability_marker():
-        """Declare free-tier compatibility; Dredge Echo never calls this function."""
-
-
 def build_agent() -> ResearchAgent:
     architect_model = os.environ["NEBIUS_MODEL"]
     arbitration_model = os.environ.get("ARBITRATION_MODEL", "moonshotai/Kimi-K3")
