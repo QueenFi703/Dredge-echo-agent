@@ -22,6 +22,12 @@ QUESTIONS = [
     "What are the documented benefits and limitations of retrieval augmented generation for factual answers?",
 ]
 
+def completion_budgets(model):
+    """Keep routine calls compact while giving GLM-5.3 room to finish reasoning."""
+    if model == "zai-org/GLM-5.3":
+        return (4096, 8192)
+    return (512, 2048)
+
 class MeteredLLM(LLMAdapter):
     def __init__(self, model):
         # Keep live measurement bounded. The earlier 2,048-token request timed out
@@ -36,7 +42,7 @@ class MeteredLLM(LLMAdapter):
         # Some reasoning models can spend a compact completion budget entirely
         # on reasoning and return no answer text. Allow one bounded recovery
         # attempt with a larger budget; transport failures are not retried.
-        for attempt, max_tokens in enumerate((512, 2048), start=1):
+        for attempt, max_tokens in enumerate(completion_budgets(self._model), start=1):
             started = perf_counter()
             print(json.dumps({"event": "model_start", "model": self._model,
                               "attempt": attempt, "max_tokens": max_tokens}), flush=True)
