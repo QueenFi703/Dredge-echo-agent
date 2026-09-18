@@ -35,8 +35,8 @@ class MeteredLLM(LLMAdapter):
                         timeout=60, max_retries=0)
         # Some reasoning models can spend a compact completion budget entirely
         # on reasoning and return no answer text. Allow one bounded recovery
-        # attempt with a slightly larger budget; transport failures are not retried.
-        for attempt, max_tokens in enumerate((512, 768), start=1):
+        # attempt with a larger budget; transport failures are not retried.
+        for attempt, max_tokens in enumerate((512, 2048), start=1):
             started = perf_counter()
             print(json.dumps({"event": "model_start", "model": self._model,
                               "attempt": attempt, "max_tokens": max_tokens}), flush=True)
