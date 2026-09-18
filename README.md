@@ -18,6 +18,10 @@ Dredge Echo is a grounded, multi-model research agent built for people who need 
 
 **It does not just answer. It shows what it knows, how it knows it, and where the evidence ends.**
 
+Architected by **Fi (QueenFi703)**, Dredge Echo is the research-agent expression of the larger Dredge vision: intelligence should be organized around the problem, evidence should outrank model agreement, and deeper reasoning should be invoked only when it earns its cost.
+
+**Project surfaces:** [Live demo](https://huggingface.co/spaces/QueenFi/Dredge-Echo) · [Devpost submission](https://devpost.com/software/dredge-echo) · [Demo video](https://youtu.be/ZG9Eg4mGg6w)
+
 ## The signal path
 
 ```text
@@ -25,7 +29,7 @@ Question
   ↓
 Tavily — Scout
   ↓
-GLM-5.3-Flash on Nebius Token Factory — Architect
+GLM-5.3 on Nebius Token Factory — Architect
   ↓
 NVIDIA Nemotron — Challenger
   ↓
@@ -39,7 +43,7 @@ Each model has one job:
 | Layer | Role | Responsibility |
 |---|---|---|
 | **Tavily** | Scout | Retrieves current, relevant web evidence at runtime. |
-| **GLM-5.3-Flash** | Architect | Produces the fast, low-cost grounded synthesis from the retrieved evidence. |
+| **GLM-5.3** | Architect | Produces the fast, low-cost grounded synthesis from the retrieved evidence. |
 | **NVIDIA Nemotron** | Challenger | Checks material claims for support, contradiction, missing context, and excess certainty. |
 | **Dredge Echo** | Router | Skips arbitration for supported answers, sends partial claims back to GLM, and escalates serious disputes. |
 | **Kimi K3** | Escalation Arbiter | Reconciles only conflicted or unsupported claims against the source packet. |
@@ -74,9 +78,25 @@ That is the echo: the answer returns with the shape of its evidence still audibl
 
 Dredge Echo uses **Nebius Token Factory** as the inference gateway and **NVIDIA Nemotron 3 Nano 30B A3B** as its evidence critic.
 
-The Nano variant fits the critic role: verification calls should be fast and economical enough to run after every synthesis, while still being capable of structured claim-level review. GLM-5.3-Flash handles routine synthesis, Nemotron adds an independent adversarial pass, and Kimi is reserved for the cases where its higher-cost reasoning adds the most value.
+The Nano variant fits the critic role: verification calls should be fast and economical enough to run after every synthesis, while still being capable of structured claim-level review. GLM-5.3 handles routine synthesis, Nemotron adds an independent adversarial pass, and Kimi is reserved for the cases where its higher-cost reasoning adds the most value.
 
 Tavily is a functional runtime component, not a decorative integration. Every live research request begins with a Tavily retrieval call whose normalized evidence is passed downstream to both synthesis and verification.
+
+## Verified live benchmark
+
+A final GitHub Actions run completed all **3/3 paired comparisons** using identical Tavily evidence, GLM drafts, and initial Nemotron assessments within each pair.
+
+| Measure | Dredge Echo dynamic routing | Always-Kimi baseline | Observed difference |
+|---|---:|---:|---:|
+| Evidence-supported final answers | **3/3** | **1/3** | Dynamic route supported all three in this sample |
+| Model calls | **9** | **13** | **30.8% fewer** |
+| Total tokens | **47,172** | **65,567** | **28.1% fewer** |
+| Aggregate latency | **211.9 s** | **275.5 s** | **23.1% less** |
+| Tavily credits | **6 total** | Shared per pair | Same evidence basis |
+
+Dredge Echo skipped unnecessary escalation on two questions and spent additional reasoning on the one answer that required repair. This is a controlled three-question sample, not a claim of universal accuracy, average production latency, or exact dollar savings. Model-specific pricing means token reductions should not be presented as invoice savings without a separate pricing calculation.
+
+[Inspect the completed workflow and artifact](https://github.com/QueenFi703/Dredge-echo-agent/actions/runs/35348811242).
 
 ## Run the demo
 
@@ -108,7 +128,7 @@ Set the model and endpoint configuration:
 ```bash
 export TAVILY_PROJECT="dredge-echo-agent"
 export NEBIUS_BASE_URL="https://api.tokenfactory.nebius.com/v1"
-export NEBIUS_MODEL="zai-org/GLM-5.3-Flash"
+export NEBIUS_MODEL="zai-org/GLM-5.3"
 export ARBITRATION_MODEL="moonshotai/Kimi-K3"
 export NVIDIA_MODEL="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
 ```
@@ -136,7 +156,7 @@ from bridge.llm_adapter import LLMAdapter
 from bridge.verification import NemotronVerifier
 
 search = TavilySearchAdapter()
-architect = LLMAdapter(backend="nebius", model="zai-org/GLM-5.3-Flash", max_tokens=2048)
+architect = LLMAdapter(backend="nebius", model="zai-org/GLM-5.3", max_tokens=2048)
 critic = LLMAdapter(backend="nebius", model="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B", max_tokens=2048)
 kimi = LLMAdapter(backend="nebius", model="moonshotai/Kimi-K3", max_tokens=2048)
 
@@ -200,22 +220,21 @@ Launch it from `.github/workflows/dredge-echo-research.yml`. Required credential
 | `tests/test_research_agent.py` | Pipeline and failure-boundary tests |
 | `docs/TAVILY_RESEARCH.md` | Deeper architecture and configuration notes |
 
-## What changed during the hackathon
+## The work behind Dredge Echo
 
-This repository began with a reusable **Fractal Operational Coherence** foundation: patterns for systems that preserve structure, observability, and graceful failure under pressure.
+Dredge Echo is not one prompt or one model wrapper. Fi designed and directed a complete evidence-aware research system:
 
-During the hackathon, that foundation became Dredge Echo through a substantial new product layer:
+- **Retrieval:** live Tavily search, source normalization, project-level usage tracking, and evidence packets shared across compared routes.
+- **Synthesis:** grounded GLM-5.3 drafting through Nebius Token Factory with explicit source and uncertainty instructions.
+- **Independent challenge:** NVIDIA Nemotron claim-by-claim verification using structured `SUPPORTED`, `PARTIAL`, `CONFLICTED`, and `UNSUPPORTED` states.
+- **Dynamic orchestration:** Dredge Echo skips needless arbitration, routes partial claims through focused repair, and reserves Kimi K3 for serious disputes.
+- **Final-answer safety:** every repaired or escalated answer receives another Nemotron check before it reaches the user.
+- **Product experience:** a Gradio interface on Hugging Face Spaces with sources, evidence status, route selection, timing, and safe failure messages.
+- **Operational proof:** deterministic route tests, provider smoke tests, GitHub Actions workflows, public benchmark artifacts, timeout diagnostics, and secret-safe logs.
+- **Cost-aware design:** routine questions stay on the economical path while difficult questions are allowed to consume deeper reasoning.
+- **Transparent limitations:** missing evidence, provider failures, truncated completions, and unresolved claims remain visible instead of being disguised as success.
 
-- Nebius Token Factory model integration;
-- live Tavily retrieval and evidence normalization;
-- low-cost GLM grounded synthesis;
-- NVIDIA Nemotron claim verification;
-- dynamic GLM repair or Kimi escalation when the critic recommends correction;
-- a Gradio/Hugging Face demo surface;
-- evidence status, source display, and stage tracing;
-- unit tests, live smoke tests, and GitHub Actions verification.
-
-The inherited coherence pattern is still present, but now it serves the agent: **Scout → Architect → Challenger → Arbiter** is the product cadence.
+The resulting cadence is **Scout → Architect → Challenger → Router → Arbiter → Final Check**. Dredge Echo decides how much intelligence the evidence actually requires.
 
 ## Known limitations
 
@@ -252,7 +271,8 @@ verification. Execution order alternates across pairs.
 
 The artifact reports measured latency, provider-reported token usage by model,
 model-call counts, final evidence statuses, and a top-level `comparison_status`.
-Provider timeouts produce an `INCOMPLETE` artifact rather than a misleading code
-failure. Only deterministic routing and accounting tests gate CI. This small sample
-does not establish general accuracy, average production latency, or dollar savings.
-Tokens across different models are not interchangeable costs.
+Provider availability failures produce an `INCOMPLETE` artifact, while unexpected
+code or integration defects still fail the workflow. Pull requests run the
+deterministic routing gate without exposing provider secrets; trusted main-branch
+runs perform the live comparison. The latest official run completed 3/3 pairs and
+is summarized above.
