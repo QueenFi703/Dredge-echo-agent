@@ -28,6 +28,12 @@ class FakeSearch:
     def search(self, *args, **kwargs):
         return {"sources": [{"id": "source-1", "url": "https://example.com", "content": "fact"}]}
 
+class TimeoutModel(FakeModel):
+    def generate(self, action, **kwargs):
+        if action == "research_and_reason":
+            raise TimeoutError("provider timed out")
+        return super().generate(action, **kwargs)
+
 class BenchmarkTests(unittest.TestCase):
     def test_paired_report_counts_each_route_and_shared_prefix_once(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -42,6 +48,18 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual([c["always_kimi"]["model_calls"] for c in report["cases"]], [4, 4, 4])
         self.assertEqual([c["dynamic"]["input_tokens"] for c in report["cases"]], [20, 40, 40])
         self.assertTrue(all(c["dynamic"]["final_overall_status"] == "SUPPORTED" for c in report["cases"]))
+        self.assertEqual(report["comparison_status"], "COMPLETE")
+
+    def test_provider_timeout_is_reported_without_failing_ci(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)/"report.json"
+            with patch.object(benchmark, "MeteredLLM", TimeoutModel), patch.object(benchmark, "TavilySearchAdapter", FakeSearch), patch.object(benchmark, "QUESTIONS", ["Q0"]), patch.object(benchmark.sys, "argv", ["benchmark", str(output)]), patch.dict(os.environ, {"NEBIUS_MODEL": "glm", "NVIDIA_MODEL": "critic", "ARBITRATION_MODEL": "kimi"}), contextlib.redirect_stdout(io.StringIO()):
+                benchmark.main()
+            report = json.loads(output.read_text())
+        self.assertEqual(report["comparison_status"], "INCOMPLETE")
+        self.assertEqual(report["complete_pairs"], 0)
+        self.assertEqual(report["cases"][0]["stage"], "synthesis")
+        self.assertEqual(report["cases"][0]["error_type"], "TimeoutError")
 
 if __name__ == "__main__":
     unittest.main()

@@ -149,18 +149,19 @@ agent = ResearchAgent(
 )
 
 result = agent.research("What changed, and what evidence supports it?")
-print(result["answer"])
-print(result["sources"])
-print(result["trace"])
+print(result.answer)
+print(result.evidence["sources"])
+print(result.trace)
 ```
 
 ## Verification contract
 
 Nemotron evaluates each material claim using structured statuses:
 
-- `supported` — the evidence directly backs the claim;
-- `unsupported` — the retrieved packet does not establish the claim;
-- `contradicted` — the evidence conflicts with the claim.
+- `SUPPORTED` — the evidence directly backs the claim;
+- `PARTIAL` — the evidence supports only part of the claim or requires qualification;
+- `CONFLICTED` — retrieved evidence materially disagrees;
+- `UNSUPPORTED` — the retrieved packet does not establish the claim.
 
 Dredge Echo records the counts, preserves the source trail, and routes corrections through arbitration. This makes verification an executable stage of the system rather than a sentence in the prompt.
 
@@ -193,7 +194,7 @@ Launch it from `.github/workflows/dredge-echo-research.yml`. Required credential
 | `app.py` | Gradio research interface |
 | `bridge/search_adapter.py` | Tavily retrieval and evidence normalization |
 | `bridge/llm_adapter.py` | Nebius Token Factory / OpenAI-compatible model access |
-| `bridge/nemotron_verifier.py` | Nemotron claim assessment |
+| `bridge/verification.py` | Nemotron claim assessment |
 | `bridge/research_agent.py` | Dredge Echo orchestration and arbitration |
 | `scripts/smoke_research.py` | End-to-end research smoke test |
 | `tests/test_research_agent.py` | Pipeline and failure-boundary tests |
@@ -250,6 +251,8 @@ always runs Kimi and then checks its answer. Both routes include final-answer
 verification. Execution order alternates across pairs.
 
 The artifact reports measured latency, provider-reported token usage by model,
-model-call counts, and final evidence statuses. This small sample does not establish
-general accuracy, average production latency, or dollar savings. Tokens across
-different models are not interchangeable costs.
+model-call counts, final evidence statuses, and a top-level `comparison_status`.
+Provider timeouts produce an `INCOMPLETE` artifact rather than a misleading code
+failure. Only deterministic routing and accounting tests gate CI. This small sample
+does not establish general accuracy, average production latency, or dollar savings.
+Tokens across different models are not interchangeable costs.
