@@ -1,5 +1,11 @@
 name: Echo paired routing benchmark
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/benchmark_routing.py"
+      - "tests/test_benchmark_routing.py"
+      - ".github/workflows/echo-routing-benchmark.yml"
   push:
     branches: [main]
     paths:
@@ -10,7 +16,17 @@ on:
 permissions:
   contents: read
 jobs:
+  deterministic-routing-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[agent]"
+      - run: python -m unittest tests.test_benchmark_routing -q
   benchmark:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -44,7 +60,7 @@ jobs:
           print("## Echo paired routing benchmark")
           print()
           print(f"- Status: **{report['comparison_status']}**")
-          print(f"- Complete pairs: **{report['complete_pairs']} / {len(report['cases'])}**")
+          print(f"- Complete pairs: **{report['complete_pairs']} / {report['requested_pairs']}**")
           if report["comparison_status"] != "COMPLETE":
               print("- No live speed, token, cost, or accuracy advantage is established by this run.")
           PY

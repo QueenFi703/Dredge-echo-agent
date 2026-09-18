@@ -22,6 +22,9 @@ QUESTIONS = [
     "What are the documented benefits and limitations of retrieval augmented generation for factual answers?",
 ]
 
+class CompletionUnavailableError(RuntimeError):
+    """A provider returned no usable completion within the bounded attempts."""
+
 def completion_budgets(model):
     """Bound reasoning models without cutting off their final answers."""
     if model in {"zai-org/GLM-5.3", "moonshotai/Kimi-K3"}:
@@ -32,6 +35,20 @@ def completion_budgets(model):
 
 def completion_is_usable(content, finish_reason):
     return bool(content.strip()) and finish_reason != "length"
+
+def is_provider_availability_error(exc):
+    """Only provider/network availability failures may leave the live job green."""
+    availability_types = {
+        "APITimeoutError", "APIConnectionError", "RateLimitError",
+        "InternalServerError", "ServiceUnavailableError", "TimeoutError",
+        "ConnectionError", "CompletionUnavailableError",
+    }
+    current = exc
+    while current is not None:
+        if type(current).__name__ in availability_types:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 class MeteredLLM(LLMAdapter):
     def __init__(self, model):
@@ -110,8 +127,10 @@ def main():
         "commit": os.environ.get("GITHUB_SHA"),
         "method": "Three paired questions; same live Tavily packet, GLM draft and initial Nemotron check per pair; baseline always runs Kimi then final Nemotron; alternating route execution order; transport failures are not retried; one bounded recovery attempt is allowed for an empty or length-truncated completion; small sample, not a general performance guarantee.",
         "comparison_status": "INCOMPLETE",
+        "requested_pairs": len(QUESTIONS),
         "cases": [],
     }
+    unexpected_error = None
     architect = MeteredLLM(os.environ["NEBIUS_MODEL"])
     critic = MeteredLLM(os.environ["NVIDIA_MODEL"])
     kimi = MeteredLLM(os.environ["ARBITRATION_MODEL"])
@@ -132,7 +151,7 @@ def main():
                     target="grounded_answer", source_value={"question": question,
                     "instructions": "Answer using the supplied evidence. Distinguish evidence from inference, do not invent sources, and include source URLs for material claims.",
                     "evidence": evidence})
-                if not draft.strip(): raise RuntimeError("Empty draft")
+                if not draft.strip(): raise CompletionUnavailableError("Empty draft")
                 case["stage"] = "initial_verification"
                 initial = verifier.verify(question=question, evidence=evidence, proposed_answer=draft)
                 shared_ms = round((perf_counter()-started)*1000)
@@ -159,7 +178,7 @@ def main():
                             source_value={"question": question, "evidence": evidence, "draft": draft,
                                 "verification": initial,
                                 "instructions": "Apply only evidence-supported corrections. Preserve supported claims, citations, and useful wording. Evidence outranks model consensus."})
-                        if not answer.strip(): raise RuntimeError("Empty baseline answer")
+                        if not answer.strip(): raise CompletionUnavailableError("Empty baseline answer")
                         final = verifier.verify(question=question, evidence=evidence, proposed_answer=answer)
                         route = "ALWAYS_KIMI"
                     post_ms = round((perf_counter()-started)*1000)
@@ -183,6 +202,9 @@ def main():
                 case["attempted_calls"] = attempted_calls
                 case["attempted_usage"] = totals(attempted_calls)
                 print(json.dumps({"question": question, "stage": case["stage"], "error_type": type(exc).__name__}), flush=True)
+                if not is_provider_availability_error(exc):
+                    unexpected_error = exc
+                    break
                 if "shared" not in case:
                     break  # Do not repeat a failed shared-stage provider call across every question.
     finally:
@@ -203,6 +225,8 @@ def main():
     print(json.dumps({"comparison_status": report["comparison_status"],
                       "complete_pairs": report["complete_pairs"],
                       "requested_pairs": len(QUESTIONS)}), flush=True)
+    if unexpected_error is not None:
+        raise unexpected_error
 
 if __name__ == "__main__":
     main()

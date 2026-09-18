@@ -43,6 +43,12 @@ class EmptyModel(FakeModel):
             return ""
         return super().generate(action, **kwargs)
 
+class DefectModel(FakeModel):
+    def generate(self, action, **kwargs):
+        if action == "research_and_reason":
+            raise KeyError("unexpected response shape")
+        return super().generate(action, **kwargs)
+
 class BenchmarkTests(unittest.TestCase):
     def test_glm_reasoning_budget_is_larger_but_bounded(self):
         self.assertEqual(benchmark.completion_budgets("zai-org/GLM-5.3"), (4096, 8192))
@@ -62,6 +68,7 @@ class BenchmarkTests(unittest.TestCase):
                 benchmark.main()
             report = json.loads(output.read_text())
         self.assertEqual(report["complete_pairs"], 3)
+        self.assertEqual(report["requested_pairs"], 3)
         self.assertEqual([c["dynamic"]["route"] for c in report["cases"]],
                          ["SKIPPED", "ARCHITECT_REPAIR", "KIMI_ESCALATION"])
         self.assertEqual([c["dynamic"]["model_calls"] for c in report["cases"]], [2, 4, 4])
@@ -81,6 +88,17 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(report["cases"][0]["stage"], "synthesis")
         self.assertEqual(report["cases"][0]["error_type"], "TimeoutError")
         self.assertEqual(report["attempted_usage"]["model_calls"], 0)
+
+    def test_unexpected_defect_is_reported_and_fails_the_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)/"report.json"
+            with patch.object(benchmark, "MeteredLLM", DefectModel), patch.object(benchmark, "TavilySearchAdapter", FakeSearch), patch.object(benchmark, "QUESTIONS", ["Q0", "Q1", "Q2"]), patch.object(benchmark.sys, "argv", ["benchmark", str(output)]), patch.dict(os.environ, {"NEBIUS_MODEL": "glm", "NVIDIA_MODEL": "critic", "ARBITRATION_MODEL": "kimi"}), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(KeyError):
+                    benchmark.main()
+            report = json.loads(output.read_text())
+        self.assertEqual(report["requested_pairs"], 3)
+        self.assertEqual(report["complete_pairs"], 0)
+        self.assertEqual(report["cases"][0]["error_type"], "KeyError")
 
     def test_empty_completion_preserves_billable_usage(self):
         with tempfile.TemporaryDirectory() as directory:
