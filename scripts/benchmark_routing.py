@@ -33,24 +33,35 @@ class MeteredLLM(LLMAdapter):
         client = OpenAI(api_key=os.environ["NEBIUS_API_KEY"],
                         base_url=os.environ.get("NEBIUS_BASE_URL", "https://api.tokenfactory.nebius.com/v1"),
                         timeout=60, max_retries=0)
-        started = perf_counter()
-        print(json.dumps({"event": "model_start", "model": self._model}), flush=True)
-        try:
-            response = client.chat.completions.create(
-                model=self._model, messages=[{"role": "user", "content": prompt}], max_tokens=512)
-        except Exception as exc:
-            print(json.dumps({"event": "model_error", "model": self._model,
-                              "error_type": type(exc).__name__,
-                              "cause_type": type(exc.__cause__).__name__,
-                              "latency_ms": round((perf_counter()-started)*1000)}), flush=True)
-            raise
-        usage = response.usage
-        self.calls.append({
-            "model": self._model, "latency_ms": round((perf_counter()-started)*1000),
-            "input_tokens": usage.prompt_tokens if usage else None,
-            "output_tokens": usage.completion_tokens if usage else None,
-        })
-        return response.choices[0].message.content or ""
+        # Some reasoning models can spend a compact completion budget entirely
+        # on reasoning and return no answer text. Allow one bounded recovery
+        # attempt with a slightly larger budget; transport failures are not retried.
+        for attempt, max_tokens in enumerate((512, 768), start=1):
+            started = perf_counter()
+            print(json.dumps({"event": "model_start", "model": self._model,
+                              "attempt": attempt, "max_tokens": max_tokens}), flush=True)
+            try:
+                response = client.chat.completions.create(
+                    model=self._model, messages=[{"role": "user", "content": prompt}],
+                    max_tokens=max_tokens)
+            except Exception as exc:
+                print(json.dumps({"event": "model_error", "model": self._model,
+                                  "attempt": attempt, "error_type": type(exc).__name__,
+                                  "cause_type": type(exc.__cause__).__name__,
+                                  "latency_ms": round((perf_counter()-started)*1000)}), flush=True)
+                raise
+            usage = response.usage
+            content = response.choices[0].message.content or ""
+            self.calls.append({
+                "model": self._model, "attempt": attempt,
+                "latency_ms": round((perf_counter()-started)*1000),
+                "input_tokens": usage.prompt_tokens if usage else None,
+                "output_tokens": usage.completion_tokens if usage else None,
+                "empty_completion": not bool(content.strip()),
+            })
+            if content.strip():
+                return content
+        return ""
 
 class ReplaySearch:
     def __init__(self, evidence): self.evidence = evidence
@@ -84,7 +95,7 @@ def main():
     report = {
         "started_at": datetime.now(timezone.utc).isoformat(),
         "commit": os.environ.get("GITHUB_SHA"),
-        "method": "Three paired questions; same live Tavily packet, GLM draft and initial Nemotron check per pair; baseline always runs Kimi then final Nemotron; alternating route execution order; no retries; small sample, not a general performance guarantee.",
+        "method": "Three paired questions; same live Tavily packet, GLM draft and initial Nemotron check per pair; baseline always runs Kimi then final Nemotron; alternating route execution order; transport failures are not retried; one bounded recovery attempt is allowed only for an empty completion; small sample, not a general performance guarantee.",
         "comparison_status": "INCOMPLETE",
         "cases": [],
     }
@@ -96,11 +107,13 @@ def main():
         for index, question in enumerate(QUESTIONS):
             case = {"question": question}
             report["cases"].append(case)
+            case_offsets = [len(m.calls) for m in (architect, critic, kimi)]
             try:
                 started = perf_counter()
                 case["stage"] = "retrieval"
                 evidence = TavilySearchAdapter().search(question, max_results=3)
                 if not evidence.get("sources"): raise RuntimeError("No evidence")
+                case["retrieval_credits"] = (evidence.get("usage") or {}).get("credits")
                 case["stage"] = "synthesis"
                 draft = architect.generate("research_and_reason", source="tavily_web_evidence",
                     target="grounded_answer", source_value={"question": question,
@@ -149,6 +162,13 @@ def main():
             except Exception as exc:
                 # Avoid exposing provider exception messages or credentials in public artifacts.
                 case["error_type"] = type(exc).__name__
+                attempted_calls = [
+                    call
+                    for model, offset in zip((architect, critic, kimi), case_offsets)
+                    for call in model.calls[offset:]
+                ]
+                case["attempted_calls"] = attempted_calls
+                case["attempted_usage"] = totals(attempted_calls)
                 print(json.dumps({"question": question, "stage": case["stage"], "error_type": type(exc).__name__}), flush=True)
                 if "shared" not in case:
                     break  # Do not repeat a failed shared-stage provider call across every question.
@@ -157,6 +177,12 @@ def main():
         report["complete_pairs"] = sum("dynamic" in c and "always_kimi" in c for c in report["cases"])
         report["comparison_status"] = (
             "COMPLETE" if report["complete_pairs"] == len(QUESTIONS) else "INCOMPLETE"
+        )
+        all_calls = architect.calls + critic.calls + kimi.calls
+        report["attempted_usage"] = totals(all_calls)
+        credits = [case.get("retrieval_credits") for case in report["cases"]]
+        report["tavily_credits"] = (
+            sum(credits) if credits and all(value is not None for value in credits) else None
         )
         output.write_text(json.dumps(report, indent=2)+"\n")
     # Provider availability is benchmark data, not a code-test verdict. The
