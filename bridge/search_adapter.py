@@ -44,6 +44,7 @@ class TavilySearchAdapter:
             query=query,
             auto_parameters=True,
             include_answer=True,
+            include_usage=True,
             include_raw_content=False,
             max_results=max_results,
         )
@@ -66,4 +67,5 @@ class TavilySearchAdapter:
             "answer": response.get("answer"),
             "sources": sources,
             "response_time": response.get("response_time"),
+            "usage": response.get("usage"),
         }
