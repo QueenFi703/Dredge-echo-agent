@@ -13,7 +13,7 @@ class WorkflowSecurityTests(unittest.TestCase):
     def test_main_trigger_and_distinct_model_variables(self):
         workflow = Path(".github/workflows/dredge-echo-research.yml").read_text()
         self.assertIn("      - main", workflow)
-        self.assertIn("NEBIUS_MODEL: ${{ vars.ARCHITECT_MODEL || 'zai-org/GLM-5.3-Flash' }}", workflow)
+        self.assertIn("NEBIUS_MODEL: ${{ vars.ARCHITECT_MODEL || 'zai-org/GLM-5.3' }}", workflow)
         self.assertIn("ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL", workflow)
         self.assertIn("NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}", workflow)
         self.assertIn('--max-results 3', workflow)
