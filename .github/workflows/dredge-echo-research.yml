@@ -33,7 +33,7 @@ jobs:
     env:
       TAVILY_PROJECT: ${{ vars.TAVILY_PROJECT || 'dredge-echo-agent' }}
       # Keep the low-cost architect separate from the legacy Kimi variable.
-      NEBIUS_MODEL: ${{ vars.ARCHITECT_MODEL || 'zai-org/GLM-5.3-Flash' }}
+      NEBIUS_MODEL: ${{ vars.ARCHITECT_MODEL || 'zai-org/GLM-5.3' }}
       ARBITRATION_MODEL: ${{ vars.ARBITRATION_MODEL || 'moonshotai/Kimi-K3' }}
       NVIDIA_MODEL: ${{ vars.NVIDIA_MODEL }}
       NEBIUS_BASE_URL: ${{ vars.NEBIUS_BASE_URL || 'https://api.tokenfactory.nebius.com/v1' }}
