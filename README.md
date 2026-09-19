@@ -10,43 +10,31 @@ pinned: false
 license: mit
 ---
 
-# Dredge Echo Astra
+# Dredge Echo — Astra Runtime
 
 > **Ask once. Dredge until the answer holds.**
 
-Dredge Echo Astra is an adaptive intelligence control plane built around GPT-6 Astra. Instead of treating every request as the same fixed pipeline, it changes both **reasoning depth** and **orchestration depth** as evidence, uncertainty, contradiction, and risk evolve.
+Dredge Echo is a dynamic intelligence control plane: it decides what work a problem deserves before asking a model to perform that work. This branch expresses that larger Dredge vision through GPT-6 Astra.
 
-It does not just answer a question. It decides how much intelligence the question deserves, expands when the evidence becomes difficult, collapses when the answer becomes stable, and exposes those decisions as structured telemetry.
+Instead of treating every request as the same fixed pipeline, Dredge changes both **reasoning depth** and **orchestration depth** as evidence, uncertainty, contradiction, and risk evolve. It expands when the evidence becomes difficult, collapses when the answer becomes stable, preserves useful work when the investigation changes, and exposes those decisions as structured telemetry.
 
-## Two architectures, one Dredge control plane
+## The Dredge Echo thesis
 
-The Astra branch exposes two explicit intelligence routes. **Astra Adaptive is the default** and the primary Product Hunt experience. The original Nebius architecture remains available only when a user deliberately selects it.
+Dredge began with a simple conviction: the shape of the reasoning process should not be fixed before the system understands the problem.
 
-| Route | Runtime path | Best for |
-|---|---|---|
-| **Astra Adaptive (default)** | Tavily → Dredge control plane → GPT-6 Astra investigator → Astra evidence challenger → Dredge arbitration | Dynamic reasoning depth, topology changes, conflict expansion, and observable orchestration |
-| **Nebius Verified (optional)** | Tavily → Kimi synthesis → NVIDIA Nemotron verification → Dredge arbitration | Comparing the original independent multi-model verification pipeline |
+That conviction became a control plane that can:
 
-There is no silent provider fallback. Selecting Astra does not call Kimi, Nemotron, or Nebius. Selecting Nebius does not call Astra. Credentials are read only while building the route that the user chose.
+- inspect the difficulty and materiality of a question;
+- choose the smallest sufficient reasoning topology;
+- create research, challenge, hypothesis, verification, and arbitration roles only when needed;
+- deepen reasoning when evidence conflicts;
+- preserve completed work while retiring branches that no longer matter;
+- stop when further computation is unlikely to improve the answer; and
+- return an inspectable evidence and execution record instead of hiding the process behind a single response.
 
-In Astra mode, names such as `challenger`, `claim_mapper`, and `arbiter` are **Dredge execution roles**, not hidden external models. GPT-6 Astra performs the language-model work through separate role-specific calls while Dredge decides when those calls are needed and how deeply they should reason.
+GPT-6 Astra supplies the frontier reasoning and research capability in this branch. Dredge supplies the intelligence architecture: when to call, what role each call performs, how deeply it should reason, what dependencies it must respect, and whether its result should be preserved, challenged, or retired.
 
-## Interactive investigations powered by Arcade
-
-The demo is conversational. After the first answer, a judge can steer the same visible investigation with instructions such as:
-
-- `Challenge that assumption.`
-- `Focus on the Missouri evidence.`
-- `What would change the recommendation?`
-
-Each browser session receives a distinct runtime identity, and recent conversation context is carried into the next Dredge turn. The interface exposes two evidence channels:
-
-| Evidence channel | Behavior |
-|---|---|
-| **Tavily web evidence (default)** | Uses the original grounded web-retrieval adapter. |
-| **Arcade live news action** | Calls `GoogleNews.SearchNewsStories` through Arcade, normalizes the result into Dredge evidence, and records the Arcade tool and execution ID in the public trace. |
-
-Arcade is an action runtime, not another reasoning model. Astra or the selected Nebius models still reason; Arcade governs the external tool call. Tool execution is allowlisted, tied to the current session user, and handled outside model context. If a future tool needs OAuth, the UI returns Arcade's HTTPS authorization link and waits for the user to retry rather than exposing credentials or letting the model manufacture an approval URL.
+Names such as `challenger`, `claim_mapper`, and `arbiter` are Dredge execution roles, not hidden external models. Astra performs the language-model work through separate role-specific calls while Dredge controls the evolving workflow.
 
 ## The idea in one line
 
@@ -250,20 +238,8 @@ bridge/execution_graph.py
 bridge/adaptive_agent.py
     Runs the adaptive research loop and emits observable intelligence events.
 
-bridge/architecture.py
-    Defines the explicit Astra-default and Nebius-opt-in routing contract.
-
-bridge/astra_verifier.py
-    Runs Astra's independent evidence-challenger call for Dredge.
-
-bridge/arcade_runtime.py
-    Authorizes and executes allowlisted Arcade tools and normalizes live news evidence.
-
 bridge/llm_adapter.py
-    Provides the isolated OpenAI/Astra and Nebius model interfaces.
-
-app.py
-    Presents the architecture selector and dispatches only the chosen path.
+    Provides the model interface used by the Astra path.
 ```
 
 ## Run the branch
@@ -276,26 +252,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Set the shared retrieval secret and the credentials for whichever routes the deployment should offer. Do not commit API keys.
+Set the required runtime secrets in your deployment environment. Do not commit API keys.
 
 ```bash
 export TAVILY_API_KEY="your-tavily-key"
-
-# Default Astra Adaptive route
 export OPENAI_API_KEY="your-openai-key"
 export OPENAI_MODEL="gpt-6-astra"
-
-# Optional Nebius Verified route
-export NEBIUS_API_KEY="your-nebius-key"
-export NEBIUS_MODEL="your-kimi-model"
-export NVIDIA_MODEL="your-nemotron-model"
-
-# Optional Arcade live-action evidence channel
-export ARCADE_API_KEY="your-arcade-project-key"
-export ARCADE_TOOL_ALLOWLIST="GoogleNews.SearchNewsStories"
 ```
-
-The selector invokes only the chosen route, so a deployment can run Astra alone or expose both architectures.
 
 Then launch:
 
@@ -321,7 +284,7 @@ That is the product.
 
 ## Competition branch boundary
 
-This branch is intentionally isolated from the Nebius hackathon submission on `main`. It can demonstrate the original Nebius runtime as an optional comparison path without changing or redeploying that submission.
+This branch is intentionally isolated from the Nebius hackathon submission on `main`. Its documentation, runtime work, and deployment remain Astra-specific; the completed Nebius submission is not changed or redeployed.
 
 ```text
 main
@@ -347,11 +310,6 @@ The Astra work remains on `feat/gpt-6-astra` unless an intentional release or me
 - ✅ Streaming topology transitions
 - ✅ Final Product Hunt presentation layer
 - ✅ Judge access flow with the published access code
-- ✅ Astra-default / Nebius-opt-in architecture selector
-- ✅ Provider-isolated runtime dispatch with no silent fallback
-- ✅ Multi-turn conversational investigation and steering
-- ✅ Arcade live-news tool execution with per-session identity
-- ✅ Arcade allowlist, authorization handoff, and execution telemetry
 
 ---
 
