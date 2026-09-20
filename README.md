@@ -43,7 +43,7 @@ Each model has one job:
 | Layer | Role | Responsibility |
 |---|---|---|
 | **Tavily** | Scout | Retrieves current, relevant web evidence at runtime. |
-| **Configured GLM model** | Architect | Produces the fast, low-cost grounded synthesis from the retrieved evidence. The benchmark used GLM-5.3; the current public Space uses GLM-5.3-Flash. |
+| **GLM-5.3** | Architect | Produces the fast, low-cost grounded synthesis from the retrieved evidence. The benchmark and current public Space use this verified route. |
 | **NVIDIA Nemotron** | Challenger | Checks material claims for support, contradiction, missing context, and excess certainty. |
 | **Dredge Echo** | Router | Skips arbitration for supported answers, sends partial claims back to GLM, and escalates serious disputes. |
 | **Kimi K3** | Escalation Arbiter | Reconciles only conflicted or unsupported claims against the source packet. |
@@ -78,7 +78,7 @@ That is the echo: the answer returns with the shape of its evidence still audibl
 
 Dredge Echo uses **Nebius Token Factory** as the inference gateway and **NVIDIA Nemotron 3 Nano 30B A3B** as its evidence critic.
 
-The Nano variant fits the critic role: verification calls should be fast and economical enough to run after every synthesis, while still being capable of structured claim-level review. A configured GLM handles routine synthesis, Nemotron adds an independent adversarial pass, and Kimi is reserved for the cases where its higher-cost reasoning adds the most value. The completed benchmark used GLM-5.3; the current public Space uses GLM-5.3-Flash.
+The Nano variant fits the critic role: verification calls should be fast and economical enough to run after every synthesis, while still being capable of structured claim-level review. GLM-5.3 handles routine synthesis, Nemotron adds an independent adversarial pass, and Kimi is reserved for the cases where its higher-cost reasoning adds the most value. The completed benchmark and current public Space use the same verified GLM-5.3 route.
 
 Tavily is a functional runtime component, not a decorative integration. Every live research request begins with a Tavily retrieval call whose normalized evidence is passed downstream to both synthesis and verification.
 
