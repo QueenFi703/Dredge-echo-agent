@@ -114,6 +114,10 @@ class NebiusBackendTests(unittest.TestCase):
             (4096, 8192),
         )
         self.assertEqual(
+            nebius_completion_budgets("zai-org/GLM-5.3-Flash", 2048),
+            (4096, 8192),
+        )
+        self.assertEqual(
             nebius_completion_budgets(
                 "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B", 2048
             ),

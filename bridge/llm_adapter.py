@@ -38,7 +38,7 @@ def nebius_completion_budgets(model: str, configured: Optional[int]):
     """Return bounded output budgets that let reasoning models emit final content."""
     if configured is None:
         return (None,)
-    if model in {"zai-org/GLM-5.3", "moonshotai/Kimi-K3"}:
+    if model in {"zai-org/GLM-5.3", "zai-org/GLM-5.3-Flash", "moonshotai/Kimi-K3"}:
         return (max(configured, 4096), max(configured * 2, 8192))
     if model.startswith("nvidia/NVIDIA-Nemotron-3-Nano"):
         return (max(configured, 2048), max(configured * 2, 4096))
