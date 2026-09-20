@@ -6,7 +6,7 @@ Dredge Echo separates retrieval, synthesis, verification, and arbitration:
 question
   -> TavilySearchAdapter
   -> normalized live web evidence
-  -> Kimi synthesis (NEBIUS_MODEL)
+  -> configured GLM synthesis (NEBIUS_MODEL)
   -> NVIDIA Nemotron evidence challenge (NVIDIA_MODEL)
   -> Dredge Echo arbitration
   -> grounded answer, evidence status, citations, and trace
@@ -60,10 +60,10 @@ A submission-ready run should demonstrate all of the following in one execution:
 
 1. Tavily returns current web evidence.
 2. Dredge Echo normalizes and passes that evidence to the reasoning layer.
-3. Kimi produces a non-empty primary synthesis.
+3. The configured GLM Architect produces a non-empty, non-truncated primary synthesis.
 4. Nemotron evaluates at least one material claim using structured evidence statuses.
 5. Dredge Echo preserves supported claims and applies necessary corrections.
 6. The console shows source URLs and a safe, inspectable execution trace.
 7. Both Token Factory requests can be located in Nebius observability.
 
-The core narrative is: **Tavily finds the evidence. Kimi reasons over it. Nemotron challenges it. Dredge Echo decides what survives. Evidence outranks model consensus.**
+The core narrative is: **Tavily finds the evidence. GLM drafts from it. Nemotron challenges it. Dredge Echo repairs partial claims or calls Kimi for serious disputes. Evidence outranks model consensus.**

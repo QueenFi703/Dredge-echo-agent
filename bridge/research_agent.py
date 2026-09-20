@@ -85,14 +85,14 @@ class ResearchAgent:
         )
         nemotron_ms = round((perf_counter() - started) * 1000)
 
-        corrections = [
+        disputed_claims = [
             claim for claim in verification["claims"]
-            if claim["status"] != "SUPPORTED" and claim.get("recommended_correction")
+            if claim["status"] != "SUPPORTED"
         ]
         answer = draft
         arbitration_route = "SKIPPED"
         arbitration_ms = 0
-        if corrections:
+        if disputed_claims:
             requires_kimi = any(
                 claim["status"] in {"CONFLICTED", "UNSUPPORTED"}
                 for claim in verification["claims"]
@@ -139,7 +139,7 @@ class ResearchAgent:
             "retrieval": {"provider": "Tavily", "source_count": len(evidence["sources"]), "latency_ms": retrieval_ms},
             "synthesis": {"provider": "Z.ai", "role": "Architect", "model": self.architect_model, "status": "COMPLETE", "latency_ms": architect_ms},
             "verification": {"provider": "NVIDIA Nemotron", "model": self.nemotron_model, "status": "COMPLETE", "latency_ms": nemotron_ms, "claims_evaluated": len(draft_verification["claims"]), **counts},
-            "arbitration": {"route": arbitration_route, "provider": "Moonshot AI Kimi" if arbitration_route == "KIMI_ESCALATION" else "Z.ai" if arbitration_route == "ARCHITECT_REPAIR" else None, "model": self.arbitrator_model if arbitration_route == "KIMI_ESCALATION" else self.architect_model if arbitration_route == "ARCHITECT_REPAIR" else None, "claims_revised": len(corrections), "evidence_confidence": _confidence(verification), "latency_ms": arbitration_ms},
+            "arbitration": {"route": arbitration_route, "provider": "Moonshot AI Kimi" if arbitration_route == "KIMI_ESCALATION" else "Z.ai" if arbitration_route == "ARCHITECT_REPAIR" else None, "model": self.arbitrator_model if arbitration_route == "KIMI_ESCALATION" else self.architect_model if arbitration_route == "ARCHITECT_REPAIR" else None, "claims_revised": len(disputed_claims), "evidence_confidence": _confidence(verification), "latency_ms": arbitration_ms},
             "final_verification": {
                 "provider": "NVIDIA Nemotron", "model": self.nemotron_model,
                 "status": final_check_status, "latency_ms": final_verification_ms,

@@ -29,7 +29,7 @@ Question
   ↓
 Tavily — Scout
   ↓
-GLM-5.3 on Nebius Token Factory — Architect
+Configured GLM on Nebius Token Factory — Architect
   ↓
 NVIDIA Nemotron — Challenger
   ↓
@@ -43,7 +43,7 @@ Each model has one job:
 | Layer | Role | Responsibility |
 |---|---|---|
 | **Tavily** | Scout | Retrieves current, relevant web evidence at runtime. |
-| **GLM-5.3** | Architect | Produces the fast, low-cost grounded synthesis from the retrieved evidence. |
+| **Configured GLM model** | Architect | Produces the fast, low-cost grounded synthesis from the retrieved evidence. The benchmark used GLM-5.3; the current public Space uses GLM-5.3-Flash. |
 | **NVIDIA Nemotron** | Challenger | Checks material claims for support, contradiction, missing context, and excess certainty. |
 | **Dredge Echo** | Router | Skips arbitration for supported answers, sends partial claims back to GLM, and escalates serious disputes. |
 | **Kimi K3** | Escalation Arbiter | Reconciles only conflicted or unsupported claims against the source packet. |
@@ -58,10 +58,10 @@ Dredge Echo turns that gap into a visible part of the product. A user can inspec
 
 - the final grounded answer;
 - the retrieved sources;
-- verification counts for supported, unsupported, and contradicted claims;
+- verification counts for supported, partial, conflicted, and unsupported claims;
 - whether arbitration revised the answer;
 - stage-level latency and model identity;
-- a clear **“Insufficient evidence”** result when retrieval cannot support an answer.
+- a clear **“Insufficient evidence”** result when retrieval returns no usable sources.
 
 That is the echo: the answer returns with the shape of its evidence still audible.
 
@@ -78,7 +78,7 @@ That is the echo: the answer returns with the shape of its evidence still audibl
 
 Dredge Echo uses **Nebius Token Factory** as the inference gateway and **NVIDIA Nemotron 3 Nano 30B A3B** as its evidence critic.
 
-The Nano variant fits the critic role: verification calls should be fast and economical enough to run after every synthesis, while still being capable of structured claim-level review. GLM-5.3 handles routine synthesis, Nemotron adds an independent adversarial pass, and Kimi is reserved for the cases where its higher-cost reasoning adds the most value.
+The Nano variant fits the critic role: verification calls should be fast and economical enough to run after every synthesis, while still being capable of structured claim-level review. A configured GLM handles routine synthesis, Nemotron adds an independent adversarial pass, and Kimi is reserved for the cases where its higher-cost reasoning adds the most value. The completed benchmark used GLM-5.3; the current public Space uses GLM-5.3-Flash.
 
 Tavily is a functional runtime component, not a decorative integration. Every live research request begins with a Tavily retrieval call whose normalized evidence is passed downstream to both synthesis and verification.
 
@@ -88,13 +88,13 @@ A final GitHub Actions run completed all **3/3 paired comparisons** using identi
 
 | Measure | Dredge Echo dynamic routing | Always-Kimi baseline | Observed difference |
 |---|---:|---:|---:|
-| Evidence-supported final answers | **3/3** | **1/3** | Dynamic route supported all three in this sample |
-| Model calls | **9** | **13** | **30.8% fewer** |
+| Nemotron-assessed `SUPPORTED` final answers | **3/3** | **1/3** | Dynamic route received a supported assessment on all three |
+| Model API attempts | **9** | **13** | **30.8% fewer** |
 | Total tokens | **47,172** | **65,567** | **28.1% fewer** |
 | Aggregate latency | **211.9 s** | **275.5 s** | **23.1% less** |
 | Tavily credits | **6 total** | Shared per pair | Same evidence basis |
 
-Dredge Echo skipped unnecessary escalation on two questions and spent additional reasoning on the one answer that required repair. This is a controlled three-question sample, not a claim of universal accuracy, average production latency, or exact dollar savings. Model-specific pricing means token reductions should not be presented as invoice savings without a separate pricing calculation.
+Dredge Echo skipped unnecessary escalation on two questions and spent additional reasoning on the one answer that required repair. `SUPPORTED` is the benchmark critic's evidence assessment, not an independent factual-accuracy score. This is a controlled three-question sample, not a claim of universal accuracy, average production latency, or exact dollar savings. Model-specific pricing means token reductions should not be presented as invoice savings without a separate pricing calculation.
 
 [Inspect the completed workflow and artifact](https://github.com/QueenFi703/Dredge-echo-agent/actions/runs/35348811242).
 
@@ -225,10 +225,10 @@ Launch it from `.github/workflows/dredge-echo-research.yml`. Required credential
 Dredge Echo is not one prompt or one model wrapper. Fi designed and directed a complete evidence-aware research system:
 
 - **Retrieval:** live Tavily search, source normalization, project-level usage tracking, and evidence packets shared across compared routes.
-- **Synthesis:** grounded GLM-5.3 drafting through Nebius Token Factory with explicit source and uncertainty instructions.
+- **Synthesis:** grounded GLM drafting through Nebius Token Factory with explicit source and uncertainty instructions.
 - **Independent challenge:** NVIDIA Nemotron claim-by-claim verification using structured `SUPPORTED`, `PARTIAL`, `CONFLICTED`, and `UNSUPPORTED` states.
 - **Dynamic orchestration:** Dredge Echo skips needless arbitration, routes partial claims through focused repair, and reserves Kimi K3 for serious disputes.
-- **Final-answer safety:** every repaired or escalated answer receives another Nemotron check before it reaches the user.
+- **Final-answer safety:** truncated completions are rejected, and every repaired or escalated answer receives another Nemotron check before it reaches the user.
 - **Product experience:** a Gradio interface on Hugging Face Spaces with sources, evidence status, route selection, timing, and safe failure messages.
 - **Operational proof:** deterministic route tests, provider smoke tests, GitHub Actions workflows, public benchmark artifacts, timeout diagnostics, and secret-safe logs.
 - **Cost-aware design:** routine questions stay on the economical path while difficult questions are allowed to consume deeper reasoning.

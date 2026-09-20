@@ -30,6 +30,10 @@ class LLMBackendError(Exception):
     """Raised when the configured LLM backend is unavailable."""
 
 
+class LLMCompletionError(LLMBackendError):
+    """Raised when a provider returns no complete, usable model response."""
+
+
 class LLMAdapter:
     """
     Model-agnostic LLM bridge for .co action declarations.
@@ -183,10 +187,24 @@ class LLMAdapter:
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
         }
+        budgets = [self._max_tokens] if self._max_tokens is not None else [None]
         if self._max_tokens is not None:
-            request["max_tokens"] = self._max_tokens
-        response = client.chat.completions.create(**request)
-        return response.choices[0].message.content or ""
+            budgets.append(self._max_tokens * 2)
+
+        for max_tokens in budgets:
+            attempt = dict(request)
+            if max_tokens is not None:
+                attempt["max_tokens"] = max_tokens
+            response = client.chat.completions.create(**attempt)
+            choice = response.choices[0]
+            content = choice.message.content or ""
+            finish_reason = getattr(choice, "finish_reason", None)
+            if content.strip() and finish_reason != "length":
+                return content
+
+        raise LLMCompletionError(
+            "Nebius returned no complete response within the bounded output budget"
+        )
 
     @staticmethod
     def _anthropic_call(prompt: str) -> str:

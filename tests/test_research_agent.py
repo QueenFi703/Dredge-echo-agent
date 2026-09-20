@@ -48,6 +48,20 @@ class ResearchAgentTests(unittest.TestCase):
         self.assertEqual(result.trace["arbitration"]["claims_revised"], 1)
         self.assertEqual(result.trace["arbitration"]["route"], "KIMI_ESCALATION")
 
+    def test_unsupported_claim_without_suggested_correction_still_escalates(self):
+        agent, _, _, arbiter = self._agent(_verification("UNSUPPORTED"))
+        result = agent.research("Question")
+        self.assertEqual(result.trace["arbitration"]["route"], "KIMI_ESCALATION")
+        self.assertEqual(result.trace["arbitration"]["claims_revised"], 1)
+        self.assertEqual(len(arbiter.calls), 1)
+
+    def test_partial_claim_without_suggested_correction_still_repairs(self):
+        agent, architect, _, arbiter = self._agent(_verification("PARTIAL"))
+        architect.response = "qualified answer"
+        result = agent.research("Question")
+        self.assertEqual(result.trace["arbitration"]["route"], "ARCHITECT_REPAIR")
+        self.assertEqual(arbiter.calls, [])
+
     def test_partial_claim_uses_low_cost_architect_repair(self):
         agent, architect, _, arbiter = self._agent(_verification("PARTIAL", "Qualify it"), "unused")
         architect.response = "qualified answer"

@@ -47,8 +47,11 @@ and the CI unit/integration jobs pass; live final verification remains unverifie
 ## Workflow interpretation
 
 Routing correctness and live-provider availability are now reported separately.
-The deterministic routing suite is a required CI gate. The live workflow caps each
-model response at 512 tokens, disables retries, and applies a 60-second request
-timeout. It always writes `comparison_status: COMPLETE|INCOMPLETE` when the process
+The deterministic routing suite is a required CI gate. The live workflow applies a
+60-second request timeout and uses bounded completion budgets: GLM/Kimi receive
+4,096 tokens followed by one 8,192-token recovery attempt, while Nemotron receives
+2,048 followed by 4,096. Recovery occurs only for an empty or length-truncated
+completion; transport failures are not retried. The workflow writes
+`comparison_status: COMPLETE|INCOMPLETE` when the process
 can produce an artifact. An incomplete provider run remains visible in the job
 summary and artifact but no longer mislabels tested routing code as broken.

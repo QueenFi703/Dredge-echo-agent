@@ -4,7 +4,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-from bridge.llm_adapter import LLMAdapter, LLMBackendError
+from bridge.llm_adapter import LLMAdapter, LLMBackendError, LLMCompletionError
 
 
 class _FakeCompletions:
@@ -15,8 +15,22 @@ class _FakeCompletions:
         self._calls.append(kwargs)
         message = types.SimpleNamespace(content="token factory response")
         return types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=message)]
+            choices=[types.SimpleNamespace(message=message, finish_reason="stop")]
         )
+
+
+class _SequenceCompletions:
+    def __init__(self, calls, responses):
+        self._calls = calls
+        self._responses = iter(responses)
+
+    def create(self, **kwargs):
+        self._calls.append(kwargs)
+        content, finish_reason = next(self._responses)
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(
+            message=types.SimpleNamespace(content=content),
+            finish_reason=finish_reason,
+        )])
 
 
 class _FakeOpenAI:
@@ -26,6 +40,18 @@ class _FakeOpenAI:
         self.options = kwargs
         self.calls = []
         self.chat = types.SimpleNamespace(completions=_FakeCompletions(self.calls))
+        self.__class__.clients.append(self)
+
+
+class _SequenceOpenAI(_FakeOpenAI):
+    responses = []
+
+    def __init__(self, **kwargs):
+        self.options = kwargs
+        self.calls = []
+        self.chat = types.SimpleNamespace(
+            completions=_SequenceCompletions(self.calls, self.__class__.responses)
+        )
         self.__class__.clients.append(self)
 
 
@@ -76,6 +102,33 @@ class NebiusBackendTests(unittest.TestCase):
         ):
             LLMAdapter(backend="nebius", model="test-model", max_tokens=800).generate("infer")
         self.assertEqual(_FakeOpenAI.clients[0].calls[0]["max_tokens"], 800)
+
+    def test_nebius_retries_a_length_truncated_completion_with_larger_budget(self):
+        _SequenceOpenAI.responses = [("truncated", "length"), ("complete", "stop")]
+        fake_module = types.SimpleNamespace(OpenAI=_SequenceOpenAI)
+        env = {"NEBIUS_API_KEY": "test-key"}
+        with patch.dict(os.environ, env, clear=True), patch.dict(
+            sys.modules, {"openai": fake_module}
+        ):
+            result = LLMAdapter(
+                backend="nebius", model="test-model", max_tokens=800
+            ).generate("infer")
+        self.assertEqual(result, "complete")
+        self.assertEqual(
+            [call["max_tokens"] for call in _SequenceOpenAI.clients[-1].calls],
+            [800, 1600],
+        )
+
+    def test_nebius_rejects_repeated_truncated_completions(self):
+        _SequenceOpenAI.responses = [("partial", "length"), ("still partial", "length")]
+        fake_module = types.SimpleNamespace(OpenAI=_SequenceOpenAI)
+        with patch.dict(os.environ, {"NEBIUS_API_KEY": "test-key"}, clear=True), patch.dict(
+            sys.modules, {"openai": fake_module}
+        ):
+            with self.assertRaises(LLMCompletionError):
+                LLMAdapter(
+                    backend="nebius", model="test-model", max_tokens=800
+                ).generate("infer")
 
     def test_nebius_requires_api_key(self):
         with patch.dict(os.environ, {"NEBIUS_MODEL": "test-model"}, clear=True):
