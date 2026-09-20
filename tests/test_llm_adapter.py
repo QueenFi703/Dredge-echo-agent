@@ -4,7 +4,12 @@ import types
 import unittest
 from unittest.mock import patch
 
-from bridge.llm_adapter import LLMAdapter, LLMBackendError, LLMCompletionError
+from bridge.llm_adapter import (
+    LLMAdapter,
+    LLMBackendError,
+    LLMCompletionError,
+    nebius_completion_budgets,
+)
 
 
 class _FakeCompletions:
@@ -102,6 +107,18 @@ class NebiusBackendTests(unittest.TestCase):
         ):
             LLMAdapter(backend="nebius", model="test-model", max_tokens=800).generate("infer")
         self.assertEqual(_FakeOpenAI.clients[0].calls[0]["max_tokens"], 800)
+
+    def test_reasoning_models_receive_completion_aware_budgets(self):
+        self.assertEqual(
+            nebius_completion_budgets("zai-org/GLM-5.3", 2048),
+            (4096, 8192),
+        )
+        self.assertEqual(
+            nebius_completion_budgets(
+                "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B", 2048
+            ),
+            (2048, 4096),
+        )
 
     def test_nebius_retries_a_length_truncated_completion_with_larger_budget(self):
         _SequenceOpenAI.responses = [("truncated", "length"), ("complete", "stop")]
