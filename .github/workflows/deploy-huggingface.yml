@@ -1,0 +1,82 @@
+name: Deploy Hugging Face Demo
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "app.py"
+      - "bridge/**"
+      - "requirements.txt"
+      - ".github/workflows/deploy-huggingface.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-huggingface-demo
+  cancel-in-progress: false
+
+jobs:
+  deploy-space:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HF_SPACE_ID: QueenFi/Dredge-Echo
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate Hugging Face deployment credential
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          test -n "$HF_TOKEN" || { echo "HF_TOKEN secret is missing"; exit 1; }
+          echo "Hugging Face deployment credential is present."
+
+      - name: Install Hugging Face Hub client
+        run: python -m pip install "huggingface_hub>=1,<2"
+
+      - name: Sync judge-facing demo files to Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          token = os.environ["HF_TOKEN"]
+          repo_id = os.environ["HF_SPACE_ID"]
+          api = HfApi(token=token)
+
+          api.upload_file(
+              path_or_fileobj="app.py",
+              path_in_repo="app.py",
+              repo_id=repo_id,
+              repo_type="space",
+              commit_message="Deploy Dredge Echo judge path",
+          )
+          api.upload_file(
+              path_or_fileobj="requirements.txt",
+              path_in_repo="requirements.txt",
+              repo_id=repo_id,
+              repo_type="space",
+              commit_message="Sync Dredge Echo runtime requirements",
+          )
+          api.upload_folder(
+              folder_path="bridge",
+              path_in_repo="bridge",
+              repo_id=repo_id,
+              repo_type="space",
+              commit_message="Sync Dredge Echo bridge runtime",
+          )
+          print(f"Synced demo runtime to {repo_id}")
+          PY
