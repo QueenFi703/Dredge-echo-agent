@@ -46,29 +46,36 @@ def build_agent() -> ResearchAgent:
 def run_research(question: str):
     question = (question or "").strip()
     if not question:
-        return "Ask a research question to begin.", "", "Waiting for a question.", "{}", "{}"
+        return "Ask a research question to begin.", "", "", "Waiting for a question.", "{}", "{}"
     if len(question) > 500:
-        return "Please shorten the question to 500 characters or fewer.", "", "Input rejected.", "{}", "{}"
+        return "Please shorten the question to 500 characters or fewer.", "", "", "Input rejected.", "{}", "{}"
 
     try:
         result = build_agent().research(question)
         output = present_result(result)
         return (
             output.answer,
+            output.route_summary,
             output.sources_markdown,
             output.evidence_status,
             output.verification_json,
             output.trace_json,
         )
     except KeyError:
-        return "Demo configuration is incomplete.", "", "Unavailable.", "{}", "{}"
+        return "Demo configuration is incomplete.", "", "", "Unavailable.", "{}", "{}"
     except RuntimeError as exc:
         if "no sources" in str(exc).lower():
-            return "Insufficient evidence", "No sources were retrieved.", "Evidence confidence: **LOW**", "{}", "{}"
-        return "The research pipeline is temporarily unavailable.", "", "Unavailable.", "{}", "{}"
-    # The public boundary must not expose provider exception text or credentials.
+            return (
+                "Insufficient evidence",
+                "**Route:** Tavily retrieval stopped before model inference.",
+                "No sources were retrieved.",
+                "Evidence confidence: **LOW**",
+                "{}",
+                "{}",
+            )
+        return "The research pipeline is temporarily unavailable.", "", "", "Unavailable.", "{}", "{}"
     except Exception:  # noqa: BLE001
-        return "The research pipeline is temporarily unavailable.", "", "Unavailable.", "{}", "{}"
+        return "The research pipeline is temporarily unavailable.", "", "", "Unavailable.", "{}", "{}"
 
 
 with gr.Blocks(title="Dredge Echo") as demo:
@@ -85,13 +92,14 @@ with gr.Blocks(title="Dredge Echo") as demo:
     )
     submit = gr.Button("Research", variant="primary")
     answer = gr.Markdown(label="Grounded answer")
+    route_summary = gr.Markdown(label="Execution route")
     evidence_status = gr.Markdown(label="Evidence status")
     sources = gr.Markdown(label="Sources")
     with gr.Accordion("Citation-integrity assessment", open=False):
         verification = gr.Code(language="json", label="Nemotron verification")
     with gr.Accordion("Observability trace", open=False):
         trace = gr.Code(language="json", label="Pipeline trace")
-    outputs = [answer, sources, evidence_status, verification, trace]
+    outputs = [answer, route_summary, sources, evidence_status, verification, trace]
     submit.click(run_research, inputs=question, outputs=outputs, concurrency_limit=2)
     question.submit(run_research, inputs=question, outputs=outputs, concurrency_limit=2)
 
