@@ -13,6 +13,7 @@ from bridge.research_agent import ResearchResult
 @dataclass(frozen=True)
 class DemoOutput:
     answer: str
+    route_summary: str
     sources_markdown: str
     evidence_status: str
     verification_json: str
@@ -35,12 +36,29 @@ def present_result(result: ResearchResult) -> DemoOutput:
         "conflicts": result.verification.get("conflicts", []),
         "missing_evidence": result.verification.get("missing_evidence", []),
     }
-    status = result.trace.get("arbitration", {}).get("evidence_confidence", "UNKNOWN")
+
+    arbitration = result.trace.get("arbitration", {})
+    route = arbitration.get("route", "UNKNOWN")
+    route_label = {
+        "SKIPPED": "No escalation needed",
+        "ARCHITECT_REPAIR": "GLM repair",
+        "KIMI_ESCALATION": "Kimi escalation",
+    }.get(route, route.replace("_", " ").title())
+    total_latency_ms = result.trace.get("total_latency_ms")
+    latency = f" · {total_latency_ms / 1000:.1f}s total" if isinstance(total_latency_ms, (int, float)) else ""
+    route_summary = (
+        "**Route:** Tavily → GLM Architect → NVIDIA Nemotron → "
+        f"**{route_label}**{latency}"
+    )
+
+    status = arbitration.get("evidence_confidence", "UNKNOWN")
     evidence_status = f"Evidence confidence: **{status}**"
     if result.trace.get("final_verification") and status != "HIGH":
         evidence_status += " — The final answer has unresolved evidence limitations; inspect the claim assessment."
+
     return DemoOutput(
         answer=result.answer,
+        route_summary=route_summary,
         sources_markdown="\n".join(source_lines) or "Insufficient evidence: no usable source URLs were returned.",
         evidence_status=evidence_status,
         verification_json=json.dumps(public_verification, indent=2),
