@@ -20,6 +20,7 @@ class FakeModel:
         if action == "verify_material_claims":
             status = {"Q0": "SUPPORTED", "Q1": "PARTIAL", "Q2": "UNSUPPORTED"}[value["question"]] if value["proposed_answer"] == "draft" else "SUPPORTED"
             return json.dumps({"claims": [{"claim": "claim", "status": status,
+                "evidence_ids": ["source-1"],
                 "recommended_correction": None if status == "SUPPORTED" else "correct"}],
                 "overall_status": status, "conflicts": [], "missing_evidence": []})
         return "revised"

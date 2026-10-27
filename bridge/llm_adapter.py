@@ -23,7 +23,17 @@ from __future__ import annotations
 
 import json
 import os
+from time import monotonic, sleep
 from typing import Any, Callable, Dict, Optional
+
+
+# Nebius limits are shared by all completion-budget attempts in one generate().
+# SDK timeouts bound each I/O phase, not a hard wall-clock cancellation. The
+# scheduling budget prevents new attempts or acceptance of late responses.
+NEBIUS_REQUEST_TIMEOUT_SECONDS = 90.0
+NEBIUS_TOTAL_BUDGET_SECONDS = 180.0
+NEBIUS_MAX_RETRIES = 1
+NEBIUS_RETRY_DELAY_SECONDS = 1.0
 
 
 class LLMBackendError(Exception):
@@ -193,25 +203,71 @@ class LLMAdapter:
                 "openai package is not installed. Run: pip install 'aster-lang[nebius]'"
             ) from exc
 
-        client = openai.OpenAI(api_key=api_key, base_url=base_url)
-        request = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        for max_tokens in nebius_completion_budgets(model, self._max_tokens):
-            attempt = dict(request)
-            if max_tokens is not None:
-                attempt["max_tokens"] = max_tokens
-            response = client.chat.completions.create(**attempt)
-            choice = response.choices[0]
-            content = choice.message.content or ""
-            finish_reason = getattr(choice, "finish_reason", None)
-            if content.strip() and finish_reason != "length":
-                return content
+        deadline = monotonic() + NEBIUS_TOTAL_BUDGET_SECONDS
+        try:
+            client = openai.OpenAI(
+                api_key=api_key, base_url=base_url,
+                timeout=NEBIUS_REQUEST_TIMEOUT_SECONDS, max_retries=0,
+            )
+        except Exception:
+            # Never expose provider URLs, response bodies, prompts, or credentials.
+            raise LLMBackendError("Nebius client could not be initialized") from None
+        try:
+            request = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            retries_left = NEBIUS_MAX_RETRIES
+            for max_tokens in nebius_completion_budgets(model, self._max_tokens):
+                attempt = dict(request)
+                if max_tokens is not None:
+                    attempt["max_tokens"] = max_tokens
+                while True:
+                    remaining = deadline - monotonic()
+                    if remaining <= 0:
+                        raise LLMBackendError("Nebius exceeded its time budget")
+                    attempt["timeout"] = min(NEBIUS_REQUEST_TIMEOUT_SECONDS, remaining)
+                    try:
+                        response = client.chat.completions.create(**attempt)
+                    except Exception as exc:
+                        status = getattr(exc, "status_code", None)
+                        retryable = (
+                            isinstance(exc, (TimeoutError, ConnectionError))
+                            or isinstance(exc, getattr(openai, "APIConnectionError", ()))
+                            or (isinstance(exc, getattr(openai, "APIStatusError", ()))
+                                and isinstance(status, int)
+                                and (status in {408, 409, 429} or 500 <= status < 600))
+                        )
+                        if not retryable or retries_left <= 0:
+                            raise LLMBackendError("Nebius request failed within the bounded retry policy") from None
+                        if deadline - monotonic() <= NEBIUS_RETRY_DELAY_SECONDS:
+                            raise LLMBackendError("Nebius exceeded its time budget") from None
+                        retries_left -= 1
+                        sleep(NEBIUS_RETRY_DELAY_SECONDS)
+                        continue
+                    if monotonic() >= deadline:
+                        raise LLMBackendError("Nebius exceeded its time budget")
+                    break
+                try:
+                    choice = response.choices[0]
+                    content = choice.message.content or ""
+                    finish_reason = getattr(choice, "finish_reason", None)
+                    if not isinstance(content, str):
+                        raise TypeError
+                except (AttributeError, IndexError, TypeError):
+                    raise LLMCompletionError("Nebius returned an invalid completion") from None
+                if content.strip() and finish_reason != "length":
+                    return content
 
-        raise LLMCompletionError(
-            "Nebius returned no complete response within the bounded output budget"
-        )
+            raise LLMCompletionError(
+                "Nebius returned no complete response within the bounded output budget"
+            )
+        finally:
+            try:
+                client.close()
+            except Exception:
+                # Cleanup must not leak provider details or mask the primary error.
+                pass
 
     @staticmethod
     def _anthropic_call(prompt: str) -> str:

@@ -185,6 +185,34 @@ Nemotron evaluates each material claim using structured statuses:
 
 Dredge Echo records the counts, preserves the source trail, and routes corrections through arbitration. This makes verification an executable stage of the system rather than a sentence in the prompt.
 
+Both the draft and any repaired answer are checked against the same retrieved
+evidence packet. Every claim must include an `evidence_ids` list containing only
+exact source IDs from that packet; missing, non-string, blank, or unknown references
+fail closed with `VerificationError`. Only `UNSUPPORTED` claims may use an empty
+list. Evidence sources must have unique non-empty string IDs and non-empty content.
+A `SUPPORTED` overall assessment cannot hide disputed claims, conflicts, or missing
+evidence. Direct callers of `parse_verification` must pass `evidence=...` as well.
+These checks establish reference integrity, not the truth of a model's assessment.
+
+### Nebius request limits
+
+Each `LLMAdapter(backend="nebius").generate(...)` uses explicit 90-second
+connect/read/write/pool timeouts and a shared 180-second scheduling budget. SDK
+automatic retries are disabled. At most one transient retry (after one second)
+is shared across the existing completion-budget attempts, so a call makes at most
+three HTTP attempts when a second completion budget is available, or two otherwise.
+Connection/timeouts and HTTP 408, 409, 429, and 5xx errors can use that retry;
+permanent errors fail immediately. Each attempt's phase timeout is clipped to the
+remaining budget, no attempt starts after it expires, and late responses are not
+accepted. Provider failures are raised as sanitized `LLMBackendError` messages.
+
+The budget is **per model call**, not for the entire Tavily/GLM/Nemotron/Kimi
+pipeline. HTTPX phase timeouts are inactivity limits, not a hard wall-clock
+cancellation of an in-flight response that continually sends data. The scheduling
+budget therefore does not promise every call returns within exactly 180 seconds.
+These settings apply to the Nebius adapter; the separate metered benchmark adapter
+and Tavily retrieval keep their existing policies.
+
 ## Test and verify
 
 Run the automated test suite:

@@ -10,5 +10,8 @@ class VerificationContractTests(unittest.TestCase):
         with self.assertRaises(VerificationError):
             parse_verification('{"claims":[],"overall_status":"SUPPORTED","conflicts":[],"missing_evidence":[]}')
     def test_rejects_unknown_status(self):
-        with self.assertRaises(VerificationError):
-            parse_verification('{"claims":[{"claim":"x","status":"MAYBE","evidence_ids":[]}],"overall_status":"PARTIAL","conflicts":[],"missing_evidence":[]}')
+        with self.assertRaisesRegex(VerificationError, "valid evidence status"):
+            parse_verification(
+                '{"claims":[{"claim":"x","status":"MAYBE","evidence_ids":[]}],"overall_status":"PARTIAL","conflicts":[],"missing_evidence":[]}',
+                evidence={"sources": [{"id": "source-1", "content": "Evidence"}]},
+            )
